@@ -1,0 +1,34 @@
+# TODO
+
+- [DONE] Resolve LangChain import error for TextLoader by removing unsupported import and handling text/plain via Blob to Document.
+- [DONE] Fix Cheerio loader import to '@langchain/community/document_loaders/web/cheerio'.
+- [DONE] Correct QdrantVectorStore constructor signature to (embeddings, { url, collectionName }).
+- [DONE] Verify backend starts successfully and health endpoint returns 200.
+
+- [TODO] Add tests for ingestion flows:
+  - [ ] Web URL ingestion (`processWebUrl`)
+  - [ ] PDF upload (`processFile` - application/pdf)
+  - [ ] DOCX upload (`processFile` - application/vnd.openxmlformats-officedocument.wordprocessingml.document)
+  - [ ] TXT upload (`processFile` - text/plain)
+  - [ ] Raw text ingestion (`processText`)
+  - [ ] Query flow (`query`) with mocked vector store
+
+- [TODO] Environment separation:
+  - [ ] Establish .env.dev, .env.test, .env.prod
+  - [ ] Configure `QDRANT_URL` per environment
+  - [ ] Use distinct `QDRANT_COLLECTION` per env (e.g., documents_dev, documents_test, documents_prod)
+
+- [TODO] CI/Automation:
+  - [ ] Add workflow to build backend and run tests on push/PR
+  - [ ] Lint/type checks if applicable
+
+- [TODO] Observability:
+  - [ ] Add basic request logging and error metrics
+  - [ ] Optionally integrate tracing later (non-blocking)
+
+- [TODO] Frontend:
+  - [ ] Wire up ingestion and query endpoints where needed
+
+- [NOTES]
+  - Keep code simple, avoid duplication, and do not introduce new tech without necessity.
+  - Never overwrite .env; use env-specific files or environment variables. 
