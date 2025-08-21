@@ -1,32 +1,34 @@
 # Stage 1: Build the application
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # Set working directory
 WORKDIR /app
 
-# Copy package files and install dependencies
+# Install dependencies
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 # Copy the rest of the application source code
 COPY . .
 
-# Build the Next.js application
+# Build the Next.js application (standalone output)
 RUN npm run build
 
 # Stage 2: Production image
-FROM node:18-alpine
-
+FROM node:20-alpine AS runner
 WORKDIR /app
+ENV NODE_ENV=production
 
-# Copy built assets from the builder stage
+# Create non-root user and group
+RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+
+# Copy only the standalone server and necessary assets
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
 
-# Expose port 3000
+USER 1001
 EXPOSE 3000
 
 # Start the Next.js application
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

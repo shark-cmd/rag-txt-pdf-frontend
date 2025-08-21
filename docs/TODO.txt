@@ -5,6 +5,13 @@
 - [DONE] Correct QdrantVectorStore constructor signature to (embeddings, { url, collectionName }).
 - [DONE] Verify backend starts successfully and health endpoint returns 200.
 
+- [DONE] Switch file ingestion to direct parsers:
+  - pdf-parse for PDF buffers
+  - mammoth.extractRawText for DOCX buffers
+  - UTF-8 decode for TXT buffers
+
+- [DONE] Switch website crawling to fetch + cheerio + html-to-text with desktop User-Agent
+
 - [TODO] Add tests for ingestion flows:
   - [ ] Web URL ingestion (`processWebUrl`)
   - [ ] PDF upload (`processFile` - application/pdf)

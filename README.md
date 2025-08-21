@@ -8,15 +8,35 @@ The application is structured as a monorepo with two main components:
 
 -   **`backend/`**: A Node.js application built with Express that exposes a REST API for the RAG pipeline. It uses Qdrant for vector storage and Google's Gemini models for embeddings and language generation.
 -   **`frontend/`**: A Next.js application that provides a web interface for interacting with the RAG system.
+-   **`docs/`**: Project documentation, steps, and TODOs used as the memory bank.
+-   **`rag-website-crawler/`**: A standalone TypeScript crawler used for reference; the backend now includes built-in website crawling.
 
 ## Features
 
 -   **Chat with your documents**: Ask questions and get answers from your private knowledge base.
--   **Support for multiple file types**: Upload PDF, TXT, and DOCX files.
--   **Text input**: Add raw text to your knowledge base directly from the web interface.
+-   **Support for multiple ingestion types**:
+    - **Upload files**: PDF, TXT, DOCX
+    - **Crawl a website URL**: Fetches HTML with a desktop User-Agent, cleans it, and indexes the text
+    - **Raw text input**
 -   **Intelligent chunking**: Documents are intelligently chunked to preserve context.
--   **High-quality embeddings**: Uses Google's `text-embedding-004` model for generating embeddings.
+-   **High-quality embeddings**: Uses Google's `embedding-001` for generating embeddings.
 -   **Fast and scalable vector search**: Powered by the Qdrant vector database.
+
+## Leaner Docker Images
+
+- Backend uses a multi-stage build with production-only dependencies and runs as a non-root user on `node:20-alpine` (Node 20 includes modern Web APIs like global `fetch` and `File`).
+- Frontend uses Next.js standalone output to ship only the server, static assets, and runs as a non-root user on `node:20-alpine`.
+- Added `.dockerignore` files to reduce build context size for faster, smaller builds.
+
+To rebuild with the lean images:
+
+```bash
+# From repo root
+docker compose build backend frontend
+docker compose up -d backend frontend
+```
+
+Note: If you see a warning that `version` is obsolete in `docker-compose.yml`, it's safe to remove the `version:` key.
 
 ## Getting Started
 
@@ -102,7 +122,7 @@ The application is structured as a monorepo with two main components:
     npm run dev
     ```
 
-    The frontend application will be available at `http://localhost:3001` (or the next available port).
+    The frontend application will typically be available at `http://localhost:3001` (Next.js will prompt to use 3001 if 3000 is taken).
 
 ### Running with Docker Compose (Recommended)
 
@@ -114,7 +134,7 @@ This is the easiest way to get the entire application stack running.
     From the root of the project, run:
 
     ```bash
-    docker-compose up --build
+    docker compose up -d --build
     ```
 
     This will build the Docker images for the frontend and backend, and start all three services.
@@ -125,11 +145,12 @@ This is the easiest way to get the entire application stack running.
 
 ## Usage
 
-Once the application is running, you can access the web interface in your browser.
+Once the application is running, open the frontend and use the left panel to ingest content:
 
--   **Add documents**: Use the "Upload File" button to upload your documents.
--   **Add text**: Paste text into the text area and click "Add Text" to add it to your knowledge base.
--   **Chat**: Type your questions into the chat input and get answers from your documents.
+-   **Upload File**: PDF, DOCX, or TXT
+-   **Add Text**: Paste raw text and add it to your knowledge base
+-   **Crawl Website**: Enter a URL; the backend will fetch using a desktop User-Agent, clean and index the content
+-   **Chat**: Ask questions in the right panel; responses are grounded in your indexed data
 
 ## Project Structure
 
@@ -139,19 +160,21 @@ Once the application is running, you can access the web interface in your browse
 │   ├── src/
 │   ├── package.json
 │   └── ...
-└── frontend/       # Next.js frontend
-    ├── src/
-    ├── app/
-    ├── components/
-    └── ...
+├── frontend/       # Next.js frontend
+│   ├── src/
+│   ├── app/
+│   ├── components/
+│   └── ...
+├── docs/           # Steps, TODOs, project description, settings
+└── rag-website-crawler/  # Standalone reference crawler (TypeScript)
 ```
 
 ## API Endpoints
 
 The backend provides the following REST API endpoints:
 
--   `POST /api/documents`: Upload and index a document.
--   `POST /api/query`: Query the RAG system.
--   `GET /api/collection`: Get information about the current collection.
--   `DELETE /api/collection`: Clear the collection (only available in development).
--   `GET /api/health`: Health check endpoint.
+-   `POST /api/documents` — Upload and index a document (multipart/form-data, field `document`)
+-   `POST /api/crawl` — Crawl and index a single URL (`{ url: string }`)
+-   `POST /api/text` — Add raw text (`{ text: string }`)
+-   `POST /api/query` — Query the RAG system (`{ question: string }`)
+-   `GET /api/health` — Health check endpoint

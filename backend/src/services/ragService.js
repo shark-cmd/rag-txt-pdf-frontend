@@ -8,10 +8,11 @@ import { createRetrievalChain } from 'langchain/chains/retrieval';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { Document } from '@langchain/core/documents';
 
-// Document loaders from '@langchain/community'
-import { CheerioWebBaseLoader } from '@langchain/community/document_loaders/web/cheerio';
-import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
-import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
+// Replace LangChain loaders with lightweight parsing utilities
+import * as cheerio from 'cheerio';
+import { htmlToText } from 'html-to-text';
+// NOTE: Avoid top-level import of pdf-parse due to module-side file reads in some versions
+import mammoth from 'mammoth';
 import logger from '../config/logger.js';
 
 class RAGService {
@@ -43,8 +44,51 @@ class RAGService {
   async processWebUrl(url) {
     try {
       logger.info(`Processing website: ${url}`);
-      const loader = new CheerioWebBaseLoader(url);
-      const docs = await loader.load();
+
+      // Fetch HTML with a desktop User-Agent and timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        },
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch URL (${response.status} ${response.statusText})`);
+      }
+
+      const html = await response.text();
+
+      // Load and clean DOM
+      const $ = cheerio.load(html);
+      $('script, style, nav, footer, header, iframe, noscript, svg').remove();
+
+      // Prefer main/article, fallback to body
+      const mainHtml = $('main').html() || $('article').html() || $('body').html() || '';
+
+      // Convert HTML to plain text
+      const textContent = htmlToText(mainHtml, {
+        wordwrap: false,
+        selectors: [
+          { selector: 'a', options: { ignoreHref: true } },
+          { selector: 'img', format: 'skip' },
+        ],
+      });
+
+      // Extract title
+      const title = $('title').text().trim() || 'Untitled Document';
+
+      // Build documents and persist
+      const docs = [
+        new Document({
+          pageContent: textContent,
+          metadata: { source: url, title },
+        }),
+      ];
+
       const chunks = await this.textSplitter.splitDocuments(docs);
       await this.vectorStore.addDocuments(chunks);
       logger.info(`Successfully processed and stored content from ${url}`);
@@ -58,30 +102,36 @@ class RAGService {
   async processFile(file) {
     try {
       logger.info(`Processing file: ${file.originalname}`);
-      const blob = new Blob([file.buffer], { type: file.mimetype });
-      let loader;
 
-      if (file.mimetype === 'application/pdf') {
-        loader = new PDFLoader(blob);
-      } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-        loader = new DocxLoader(blob);
-      } else if (file.mimetype === 'text/plain') {
-        // Directly create a Document from the text Blob to avoid TextLoader import issues
-        const textContent = await blob.text();
-        const docs = [new Document({ pageContent: textContent, metadata: { source: file.originalname } })];
-        const chunks = await this.textSplitter.splitDocuments(docs);
-        await this.vectorStore.addDocuments(chunks);
-        logger.info(`Successfully processed and stored content from ${file.originalname}`);
-        return { success: true, chunksAdded: chunks.length };
+      const { mimetype, buffer, originalname } = file;
+      let textContent = '';
+
+      if (mimetype === 'application/pdf') {
+        // Dynamic import from the library path to avoid module-side file reads
+        const pdfModule = await import('pdf-parse/lib/pdf-parse.js');
+        const pdfParse = pdfModule.default || pdfModule;
+        const data = await pdfParse(buffer);
+        textContent = data.text || '';
+      } else if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        const result = await mammoth.extractRawText({ buffer });
+        textContent = result.value || '';
+      } else if (mimetype === 'text/plain') {
+        textContent = buffer.toString('utf8');
       } else {
         throw new Error('Unsupported file type');
       }
 
-      const docs = await loader.load();
+      if (!textContent || !textContent.trim()) {
+        throw new Error('No extractable text content found in file');
+      }
+
+      const docs = [
+        new Document({ pageContent: textContent, metadata: { source: originalname } }),
+      ];
       const chunks = await this.textSplitter.splitDocuments(docs);
       await this.vectorStore.addDocuments(chunks);
 
-      logger.info(`Successfully processed and stored content from ${file.originalname}`);
+      logger.info(`Successfully processed and stored content from ${originalname}`);
       return { success: true, chunksAdded: chunks.length };
     } catch (error) {
       logger.error(`Error processing file ${file.originalname}: ${error.message}`);
