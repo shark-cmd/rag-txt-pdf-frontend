@@ -12,6 +12,31 @@
 
 - [DONE] Switch website crawling to fetch + cheerio + html-to-text with desktop User-Agent
 
+- [DONE] Add recursive website crawling:
+  - Backend: WebsiteCrawler class with recursive link discovery
+  - Backend: robots.txt checking, rate limiting, and domain filtering
+  - Backend: Configurable max pages (50) and delay between requests
+  - Backend: Enhanced progress reporting for multi-page crawls
+  - Frontend: Updated progress messages for recursive crawling
+
+- [DONE] Add SSE-based progress updates and sources sidebar:
+  - Backend: GET /api/progress/:opId endpoint with EventSource
+  - Backend: emitProgress/emitDone in file/crawl/text processing
+  - Frontend: opId generation, EventSource connection, friendly progress lines
+  - Frontend: Sources panel showing URLs/filenames after ingestion
+
+- [DONE] Add document listing and database overview:
+  - Backend: GET /api/documents endpoint to list all documents in collection
+  - Backend: listDocuments() method to retrieve unique sources with chunk counts
+  - Frontend: Sources panel shows all documents with refresh button
+  - Frontend: Auto-refresh after new ingestion completes
+
+- [DONE] Add document deletion functionality:
+  - Backend: DELETE /api/documents/:source endpoint to remove documents by source
+  - Backend: deleteDocument() method to remove chunks from vector store
+  - Frontend: Delete buttons (✗) next to each document in Sources panel
+  - Frontend: Auto-refresh after deletion completes
+
 - [TODO] Add tests for ingestion flows:
   - [ ] Web URL ingestion (`processWebUrl`)
   - [ ] PDF upload (`processFile` - application/pdf)
@@ -35,6 +60,7 @@
 
 - [TODO] Frontend:
   - [ ] Wire up ingestion and query endpoints where needed
+  - [ ] Resolve TypeScript declaration issues (next/react/axios types)
 
 - [NOTES]
   - Keep code simple, avoid duplication, and do not introduce new tech without necessity.

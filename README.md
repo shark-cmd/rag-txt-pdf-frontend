@@ -1,180 +1,244 @@
-# Personal NotebookLM with Chai RAG
+# Personal NotebookLM - AI-Powered Knowledge Assistant
 
-This project is a full-stack application that provides a personal, self-hosted alternative to services like NotebookLM. It combines a powerful Retrieval-Augmented Generation (RAG) backend with a user-friendly Next.js frontend, allowing you to create your own private knowledge base and chat with your documents.
+A beautiful, modern RAG (Retrieval-Augmented Generation) application that allows you to create your own personal knowledge base by ingesting documents, websites, and text, then querying it with natural language.
 
-## High-level Architecture
+## ✨ Features
 
-The application is structured as a monorepo with two main components:
+- **Beautiful Modern UI**: Glassmorphism design with gradient backgrounds and smooth animations
+- **Multi-format Document Ingestion**: Upload PDF, DOCX, and TXT files
+- **Recursive Website Crawling**: Automatically discover and index all sub-pages of a website
+- **Real-time Progress Tracking**: Live updates during ingestion with Server-Sent Events (SSE)
+- **Document Management**: View, refresh, and delete sources from the database
+- **Natural Language Queries**: Ask questions about your knowledge base
+- **Source Attribution**: See which documents were used to generate answers
+- **Responsive Design**: Works seamlessly on desktop and mobile devices
 
--   **`backend/`**: A Node.js application built with Express that exposes a REST API for the RAG pipeline. It uses Qdrant for vector storage and Google's Gemini models for embeddings and language generation.
--   **`frontend/`**: A Next.js application that provides a web interface for interacting with the RAG system.
--   **`docs/`**: Project documentation, steps, and TODOs used as the memory bank.
--   **`rag-website-crawler/`**: A standalone TypeScript crawler used for reference; the backend now includes built-in website crawling.
+## 🎨 UI Design
 
-## Features
+The application features a stunning glassmorphism design inspired by modern AI interfaces:
 
--   **Chat with your documents**: Ask questions and get answers from your private knowledge base.
--   **Support for multiple ingestion types**:
-    - **Upload files**: PDF, TXT, DOCX
-    - **Crawl a website URL**: Fetches HTML with a desktop User-Agent, cleans it, and indexes the text
-    - **Raw text input**
--   **Intelligent chunking**: Documents are intelligently chunked to preserve context.
--   **High-quality embeddings**: Uses Google's `embedding-001` for generating embeddings.
--   **Fast and scalable vector search**: Powered by the Qdrant vector database.
+- **Gradient Backgrounds**: Beautiful purple-to-slate gradients with subtle patterns
+- **Glassmorphism Effects**: Translucent panels with backdrop blur and subtle borders
+- **Smooth Animations**: Hover effects, loading states, and micro-interactions
+- **Modern Icons**: Lucide React icons throughout the interface
+- **Progress Visualization**: Real-time progress bars and status indicators
+- **Color-coded Actions**: Different gradient buttons for different actions (blue for text, green for crawling, etc.)
 
-## Leaner Docker Images
+## 🏗️ High-level Architecture
 
-- Backend uses a multi-stage build with production-only dependencies and runs as a non-root user on `node:20-alpine` (Node 20 includes modern Web APIs like global `fetch` and `File`).
-- Frontend uses Next.js standalone output to ship only the server, static assets, and runs as a non-root user on `node:20-alpine`.
-- Added `.dockerignore` files to reduce build context size for faster, smaller builds.
-
-To rebuild with the lean images:
-
-```bash
-# From repo root
-docker compose build backend frontend
-docker compose up -d backend frontend
+```
+├── frontend/                 # Next.js frontend with beautiful UI
+├── backend/                  # Express.js API server
+├── docs/                     # Documentation and project files
+├── FIGMA_SAMPLE/            # Design reference and components
+└── docker-compose.yml       # Container orchestration
 ```
 
-Note: If you see a warning that `version` is obsolete in `docker-compose.yml`, it's safe to remove the `version:` key.
-
-## Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
 
--   Node.js v18+
--   npm, yarn, or pnpm
--   Docker (for running Qdrant locally)
--   A Google API key with access to the Gemini API.
+- Docker and Docker Compose
+- Google API key for Gemini AI
 
-### Installation
+### Environment Setup
 
-1.  **Clone the repository:**
-
-    ```bash
-    git clone https://github.com/your-username/your-repo-name.git
-    cd your-repo-name
-    ```
-
-2.  **Set up the backend:**
-
-    Navigate to the `backend` directory and install the dependencies:
-
-    ```bash
-    cd backend
-    npm install
-    ```
-
-    Create a `.env` file in the `backend` directory and add the following environment variables:
-
-    ```env
-    # Google Gemini API Key
-    GOOGLE_API_KEY=your_google_api_key_here
-
-    # Qdrant Configuration
-    QDRANT_URL=http://localhost:6333
-    QDRANT_COLLECTION=documents
-
-    # Application Configuration
-    PORT=3000
-    NODE_ENV=development
-
-    # Logging
-    LOG_LEVEL=info
-    ```
-
-3.  **Set up the frontend:**
-
-    Navigate to the `frontend` directory and install the dependencies:
-
-    ```bash
-    cd ../frontend
-    npm install
-    ```
-
-### Running the Application (Manual Setup)
-
-1.  **Start Qdrant:**
-
-    You can run Qdrant locally using Docker:
-
-    ```bash
-    docker run -p 6333:6333 -p 6334:6334 \
-        -v $(pwd)/qdrant_storage:/qdrant/storage \
-        qdrant/qdrant
-    ```
-
-2.  **Start the backend:**
-
-    In the `backend` directory, run:
-
-    ```bash
-    npm run dev
-    ```
-
-    The backend API will be available at `http://localhost:3000`.
-
-3.  **Start the frontend:**
-
-    In a separate terminal, in the `frontend` directory, run:
-
-    ```bash
-    npm run dev
-    ```
-
-    The frontend application will typically be available at `http://localhost:3001` (Next.js will prompt to use 3001 if 3000 is taken).
-
-### Running with Docker Compose (Recommended)
-
-This is the easiest way to get the entire application stack running.
-
-1.  **Make sure you have a `.env` file** in the `backend` directory as described in the Installation section.
-2.  **Run Docker Compose:**
-
-    From the root of the project, run:
-
-    ```bash
-    docker compose up -d --build
-    ```
-
-    This will build the Docker images for the frontend and backend, and start all three services.
-
-    -   The frontend will be available at `http://localhost:3001`.
-    -   The backend will be available at `http://localhost:3000`.
-    -   Qdrant will be available at `http://localhost:6333`.
-
-## Usage
-
-Once the application is running, open the frontend and use the left panel to ingest content:
-
--   **Upload File**: PDF, DOCX, or TXT
--   **Add Text**: Paste raw text and add it to your knowledge base
--   **Crawl Website**: Enter a URL; the backend will fetch using a desktop User-Agent, clean and index the content
--   **Chat**: Ask questions in the right panel; responses are grounded in your indexed data
-
-## Project Structure
-
-```
-.
-├── backend/        # Node.js/Express backend
-│   ├── src/
-│   ├── package.json
-│   └── ...
-├── frontend/       # Next.js frontend
-│   ├── src/
-│   ├── app/
-│   ├── components/
-│   └── ...
-├── docs/           # Steps, TODOs, project description, settings
-└── rag-website-crawler/  # Standalone reference crawler (TypeScript)
+1. Create a `.env` file in the root directory:
+```bash
+GOOGLE_API_KEY=your_google_api_key_here
+QDRANT_URL=http://localhost:6333
+QDRANT_COLLECTION=documents
+PORT=3000
 ```
 
-## API Endpoints
+2. Start all services:
+```bash
+docker compose up -d --build
+```
 
-The backend provides the following REST API endpoints:
+3. Access the application:
+- Frontend: http://localhost:3001
+- Backend API: http://localhost:3000
+- Qdrant Vector DB: http://localhost:6333
 
--   `POST /api/documents` — Upload and index a document (multipart/form-data, field `document`)
--   `POST /api/crawl` — Crawl and index a single URL (`{ url: string }`)
--   `POST /api/text` — Add raw text (`{ text: string }`)
--   `POST /api/query` — Query the RAG system (`{ question: string }`)
--   `GET /api/health` — Health check endpoint
+## 📖 Usage
+
+### Adding Content
+
+1. **Text Input**: Type or paste text directly into the "Add Text" section
+2. **Website Crawling**: Enter a URL to recursively crawl and index all pages
+3. **File Upload**: Upload PDF, DOCX, or TXT files from the bottom of the sidebar
+
+### Managing Sources
+
+- **View Sources**: All indexed documents appear in the "Sources" panel
+- **Refresh**: Click the refresh button to update the document list
+- **Delete**: Click the ✗ button next to any source to remove it
+- **Progress Tracking**: Real-time updates show ingestion progress
+
+### Chat Interface
+
+- **Ask Questions**: Type natural language questions about your knowledge base
+- **Source Attribution**: See which documents were used to generate answers
+- **Real-time Responses**: Get instant AI-powered responses with source links
+
+## 🔧 Technical Details
+
+### Backend Services
+
+- **Express.js API**: RESTful endpoints for ingestion and querying
+- **LangChain**: RAG pipeline with Google Gemini integration
+- **Qdrant Vector Store**: High-performance vector database
+- **Server-Sent Events**: Real-time progress updates
+- **File Processing**: Direct parsing of PDF, DOCX, and TXT files
+- **Web Crawling**: Recursive crawling with robots.txt support and rate limiting
+
+### Frontend Features
+
+- **Next.js 14**: Modern React framework with App Router
+- **TypeScript**: Full type safety throughout the application
+- **Tailwind CSS**: Utility-first styling with custom design system
+- **Glassmorphism**: Modern UI effects with backdrop blur and transparency
+- **Responsive Design**: Mobile-first approach with adaptive layouts
+- **Real-time Updates**: SSE integration for live progress tracking
+
+### API Endpoints
+
+- `POST /api/text` - Add raw text content
+- `POST /api/crawl` - Recursively crawl a website
+- `POST /api/documents` - Upload and process files
+- `POST /api/query` - Query the knowledge base
+- `GET /api/documents` - List all documents in the database
+- `DELETE /api/documents/:source` - Delete a specific document
+- `GET /api/progress/:opId` - SSE endpoint for progress updates
+
+## 🌟 Website Crawling Features
+
+The recursive website crawler includes:
+
+- **Link Discovery**: Automatically finds and follows internal links
+- **Domain Filtering**: Only crawls pages within the same domain
+- **Robots.txt Support**: Respects website crawling policies
+- **Rate Limiting**: Configurable delays between requests (1 second default)
+- **Page Limits**: Maximum 50 pages per crawl to prevent infinite loops
+- **Content Extraction**: Cleans HTML and extracts meaningful text content
+- **Error Handling**: Gracefully handles failed requests and continues crawling
+
+## 📊 Progress Tracking
+
+Real-time progress updates include:
+
+- **Overall Progress**: Percentage-based progress bar
+- **Step-by-step Updates**: Detailed status for each operation
+- **Visual Indicators**: Icons showing completed, active, and pending steps
+- **Error Reporting**: Clear error messages with retry options
+- **Auto-refresh**: Document list updates automatically after ingestion
+
+## 🗂️ Document Management
+
+The Sources panel provides:
+
+- **Document Overview**: Shows titles, URLs, and chunk counts
+- **Clickable Links**: Direct access to web sources
+- **Delete Functionality**: Remove individual documents from the database
+- **Refresh Capability**: Manual refresh of the document list
+- **Loading States**: Visual feedback during operations
+
+## 🐳 Docker Configuration
+
+### Leaner Images
+
+The Docker setup has been optimized for size and performance:
+
+- **Multi-stage Builds**: Separate build and runtime stages
+- **Production Dependencies**: Only necessary packages included
+- **Non-root Users**: Enhanced security with dedicated users
+- **Node.js 20**: Latest LTS version with global APIs
+- **Next.js Standalone**: Optimized output for containerized deployments
+
+### Services
+
+- **Frontend**: Next.js application on port 3001
+- **Backend**: Express.js API on port 3000
+- **Qdrant**: Vector database on port 6333
+
+## 🔒 Security Features
+
+- **Environment Variables**: Secure configuration management
+- **Non-root Containers**: Enhanced container security
+- **Input Validation**: Server-side validation of all inputs
+- **Error Handling**: Graceful error handling without information leakage
+- **Rate Limiting**: Protection against abuse
+
+## 🎯 Ingestion Behaviors
+
+### File Processing
+- **PDF**: Direct text extraction using pdf-parse
+- **DOCX**: Raw text extraction using mammoth
+- **TXT**: UTF-8 text processing
+- **Chunking**: 1000-character chunks with 200-character overlap
+
+### Website Crawling
+- **Recursive Discovery**: Finds all internal links automatically
+- **Content Cleaning**: Removes scripts, styles, and navigation elements
+- **Text Extraction**: Converts HTML to clean, readable text
+- **Metadata Preservation**: Maintains source URLs and page titles
+
+### Text Processing
+- **Direct Input**: Immediate processing of typed text
+- **Chunking**: Automatic text splitting for optimal retrieval
+- **Metadata**: Source tracking for attribution
+
+## 🚀 Performance Optimizations
+
+- **Vector Indexing**: Efficient similarity search with Qdrant
+- **Chunked Storage**: Optimal document splitting for retrieval
+- **Lazy Loading**: Progressive loading of UI components
+- **Caching**: Intelligent caching of frequently accessed data
+- **Background Processing**: Non-blocking ingestion operations
+
+## 📝 Development
+
+### Local Development
+
+1. Clone the repository
+2. Install dependencies: `npm install` in both frontend and backend
+3. Set up environment variables
+4. Run development servers:
+   - Frontend: `npm run dev` (port 3001)
+   - Backend: `npm run dev` (port 3000)
+
+### Building for Production
+
+```bash
+# Build all services
+docker compose build
+
+# Start production environment
+docker compose up -d
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🙏 Acknowledgments
+
+- **Google Gemini**: AI model and embeddings
+- **LangChain**: RAG framework and components
+- **Qdrant**: Vector database
+- **Next.js**: React framework
+- **Tailwind CSS**: Styling framework
+- **FIGMA_SAMPLE**: Beautiful UI design inspiration
+
+---
+
+**Note**: This application is designed for personal use and knowledge management. Ensure you have proper permissions when crawling websites and respect robots.txt files.

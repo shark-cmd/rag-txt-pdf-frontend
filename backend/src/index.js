@@ -26,21 +26,31 @@ async function initializeApp() {
     // Import RAG service dynamically
     const ragModule = await import('./services/ragService.js');
     ragService = ragModule.default;
-    
+
+    // Progress SSE
+    const progressModule = await import('./services/progress.js');
+    const { sseHandler, emitProgress } = progressModule;
+
     // --- API Routes ---
-    
+
     // Health check endpoint
     app.get('/api/health', (req, res) => {
       res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
     });
 
+    // SSE channel for progress
+    app.get('/api/progress/:opId', sseHandler);
+
     // Ingest a document from file upload
     app.post('/api/documents', upload.single('document'), async (req, res, next) => {
       try {
+        const { opId } = req.query;
         if (!req.file) {
           return res.status(400).json({ error: 'No file uploaded' });
         }
-        const result = await ragService.processFile(req.file);
+        emitProgress?.(opId, `Uploading file: ${req.file.originalname}`);
+        const result = await ragService.processFile(req.file, opId);
+        emitProgress?.(opId, `File processed: ${req.file.originalname}`, result);
         res.status(201).json(result);
       } catch (error) {
         next(error);
@@ -51,10 +61,13 @@ async function initializeApp() {
     app.post('/api/crawl', async (req, res, next) => {
       try {
         const { url } = req.body;
+        const { opId } = req.query;
         if (!url) {
           return res.status(400).json({ error: 'URL is required' });
         }
-        const result = await ragService.processWebUrl(url);
+        emitProgress?.(opId, `Starting crawl: ${url}`);
+        const result = await ragService.processWebUrl(url, opId);
+        emitProgress?.(opId, `Crawl complete: ${url}`, result);
         res.status(201).json(result);
       } catch (error) {
         next(error);
@@ -65,10 +78,13 @@ async function initializeApp() {
     app.post('/api/text', async (req, res, next) => {
       try {
         const { text } = req.body;
+        const { opId } = req.query;
         if (!text) {
           return res.status(400).json({ error: 'Text content is required' });
         }
-        const result = await ragService.processText(text);
+        emitProgress?.(opId, `Processing text input`);
+        const result = await ragService.processText(text, opId);
+        emitProgress?.(opId, `Text processed`, result);
         res.status(201).json(result);
       } catch (error) {
         next(error);
@@ -84,6 +100,30 @@ async function initializeApp() {
         }
         const answer = await ragService.query(question);
         res.json({ answer });
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    // List all documents endpoint
+    app.get('/api/documents', async (req, res, next) => {
+      try {
+        const result = await ragService.listDocuments();
+        res.json(result);
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    // Delete document endpoint
+    app.delete('/api/documents/:source', async (req, res, next) => {
+      try {
+        const { source } = req.params;
+        if (!source) {
+          return res.status(400).json({ error: 'Source is required' });
+        }
+        const result = await ragService.deleteDocument(decodeURIComponent(source));
+        res.json(result);
       } catch (error) {
         next(error);
       }
