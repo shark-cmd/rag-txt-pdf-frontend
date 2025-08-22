@@ -51,6 +51,16 @@ const Home: NextPage = () => {
   // State for timestamp removal
   const [removeTimestamps, setRemoveTimestamps] = useState(false);
 
+  // State for Qdrant Cloud configuration
+  const [useQdrantCloud, setUseQdrantCloud] = useState(false);
+  const [qdrantCloudConfig, setQdrantCloudConfig] = useState({
+    url: '',
+    apiKey: '',
+    collectionName: 'documents'
+  });
+  const [isConnectingToCloud, setIsConnectingToCloud] = useState(false);
+  const [cloudConnectionStatus, setCloudConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
+
   useEffect(() => {
     return () => {
       // cleanup SSE on unmount
@@ -64,7 +74,33 @@ const Home: NextPage = () => {
   // Load all documents on component mount
   useEffect(() => {
     fetchAllDocuments();
+    checkCloudConnectionStatus();
   }, []);
+
+  const checkCloudConnectionStatus = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/qdrant-cloud/status`);
+      if (response.data.success) {
+        if (response.data.isUsingCloud) {
+          setCloudConnectionStatus('connected');
+          setUseQdrantCloud(true);
+          if (response.data.config) {
+            setQdrantCloudConfig(prev => ({
+              ...prev,
+              url: response.data.config.url,
+              collectionName: response.data.config.collectionName
+            }));
+          }
+        } else {
+          setCloudConnectionStatus('disconnected');
+          setUseQdrantCloud(false);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to check cloud connection status:', err);
+      setCloudConnectionStatus('disconnected');
+    }
+  };
 
   const fetchAllDocuments = async () => {
     setIsLoadingDocuments(true);
@@ -276,6 +312,51 @@ const Home: NextPage = () => {
     }
   };
 
+  const connectToQdrantCloud = async () => {
+    if (!qdrantCloudConfig.url || !qdrantCloudConfig.apiKey) {
+      setError('Please provide both Qdrant Cloud URL and API Key');
+      return;
+    }
+
+    setIsConnectingToCloud(true);
+    setCloudConnectionStatus('connecting');
+    setError(null);
+
+    try {
+      const response = await axios.post(`${API_URL}/qdrant-cloud/connect`, {
+        url: qdrantCloudConfig.url,
+        apiKey: qdrantCloudConfig.apiKey,
+        collectionName: qdrantCloudConfig.collectionName
+      });
+
+      if (response.data.success) {
+        setCloudConnectionStatus('connected');
+        setError(null);
+        // Refresh documents list to show cloud data
+        await fetchAllDocuments();
+      } else {
+        throw new Error(response.data.message || 'Failed to connect to Qdrant Cloud');
+      }
+    } catch (err) {
+      setCloudConnectionStatus('error');
+      handleError(err, 'Failed to connect to Qdrant Cloud. Please check your credentials.');
+    } finally {
+      setIsConnectingToCloud(false);
+    }
+  };
+
+  const disconnectFromQdrantCloud = async () => {
+    try {
+      await axios.post(`${API_URL}/qdrant-cloud/disconnect`);
+      setCloudConnectionStatus('disconnected');
+      setUseQdrantCloud(false);
+      // Refresh documents list to show local data
+      await fetchAllDocuments();
+    } catch (err) {
+      handleError(err, 'Failed to disconnect from Qdrant Cloud.');
+    }
+  };
+
   const completedCount = progressLines.filter(line => line.includes('Done') || line.includes('complete')).length;
   const progressPercentage = progressLines.length > 0 ? (completedCount / progressLines.length) * 100 : 0;
 
@@ -431,7 +512,10 @@ const Home: NextPage = () => {
                   />
                 </div>
                 <p className="text-xs text-white/60 mt-1">
-                  Keep timestamps for valuable timing information
+                  {removeTimestamps
+                    ? "Timestamps will be removed for cleaner text"
+                    : "Timestamps will be preserved for timing information"
+                  }
                 </p>
               </div>
 
@@ -527,6 +611,116 @@ const Home: NextPage = () => {
                   ))
                 )}
               </div>
+            </div>
+
+            {/* Qdrant Cloud Configuration */}
+            <div className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 text-white">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                  </svg>
+                  <h3 className="font-semibold">Qdrant Cloud</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${cloudConnectionStatus === 'connected' ? 'bg-green-400' :
+                    cloudConnectionStatus === 'connecting' ? 'bg-yellow-400' :
+                      cloudConnectionStatus === 'error' ? 'bg-red-400' : 'bg-gray-400'
+                    }`} />
+                  <span className="text-xs text-white/60">
+                    {cloudConnectionStatus === 'connected' ? 'Connected' :
+                      cloudConnectionStatus === 'connecting' ? 'Connecting...' :
+                        cloudConnectionStatus === 'error' ? 'Error' : 'Disconnected'}
+                  </span>
+                </div>
+              </div>
+
+              {!useQdrantCloud ? (
+                <button
+                  onClick={() => setUseQdrantCloud(true)}
+                  className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0 rounded-md py-2 px-4 transition-all duration-200 transform hover:scale-[1.02] flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                  </svg>
+                  Use Qdrant Cloud
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-white/80 block mb-1">Cloud URL</label>
+                    <input
+                      type="url"
+                      placeholder="https://your-cluster.qdrant.io"
+                      value={qdrantCloudConfig.url}
+                      onChange={(e) => setQdrantCloudConfig(prev => ({ ...prev, url: e.target.value }))}
+                      className="w-full bg-white/5 border border-white/20 text-white placeholder:text-white/40 focus:border-indigo-400 focus:ring-indigo-400/20 rounded-md p-2 text-sm"
+                      disabled={cloudConnectionStatus === 'connected'}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-white/80 block mb-1">API Key</label>
+                    <input
+                      type="password"
+                      placeholder="Your Qdrant Cloud API Key"
+                      value={qdrantCloudConfig.apiKey}
+                      onChange={(e) => setQdrantCloudConfig(prev => ({ ...prev, apiKey: e.target.value }))}
+                      className="w-full bg-white/5 border border-white/20 text-white placeholder:text-white/40 focus:border-indigo-400 focus:ring-indigo-400/20 rounded-md p-2 text-sm"
+                      disabled={cloudConnectionStatus === 'connected'}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-white/80 block mb-1">Collection Name</label>
+                    <input
+                      type="text"
+                      placeholder="documents"
+                      value={qdrantCloudConfig.collectionName}
+                      onChange={(e) => setQdrantCloudConfig(prev => ({ ...prev, collectionName: e.target.value }))}
+                      className="w-full bg-white/5 border border-white/20 text-white placeholder:text-white/40 focus:border-indigo-400 focus:ring-indigo-400/20 rounded-md p-2 text-sm"
+                      disabled={cloudConnectionStatus === 'connected'}
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    {cloudConnectionStatus === 'connected' ? (
+                      <button
+                        onClick={disconnectFromQdrantCloud}
+                        className="flex-1 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white border-0 rounded-md py-2 px-4 transition-all duration-200 transform hover:scale-[1.02] text-sm"
+                      >
+                        Disconnect
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={connectToQdrantCloud}
+                          disabled={isConnectingToCloud || !qdrantCloudConfig.url || !qdrantCloudConfig.apiKey}
+                          className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white border-0 rounded-md py-2 px-4 transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
+                        >
+                          {isConnectingToCloud ? (
+                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          ) : (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                          )}
+                          {isConnectingToCloud ? 'Connecting...' : 'Connect'}
+                        </button>
+                        <button
+                          onClick={() => setUseQdrantCloud(false)}
+                          className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white border-0 rounded-md py-2 px-4 transition-all duration-200 transform hover:scale-[1.02] text-sm"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </aside>

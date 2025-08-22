@@ -15,6 +15,7 @@ A beautiful, modern RAG (Retrieval-Augmented Generation) application featuring H
 - **Natural Language Queries**: Ask questions about your knowledge base in conversational Hinglish
 - **Source Attribution**: See which documents were used to generate answers
 - **Responsive Design**: Works seamlessly on desktop and mobile devices
+- **Qdrant Cloud Integration**: Optional cloud-based vector database for enhanced scalability and performance
 
 ## 🎨 UI Design
 
@@ -73,6 +74,30 @@ The application features a stunning glassmorphism design inspired by modern AI i
    - Frontend: http://localhost:3001
    - Backend API: http://localhost:3000
    - Qdrant Vector DB: http://localhost:6333
+
+### Qdrant Cloud Configuration (Optional)
+
+For enhanced scalability and performance, you can optionally use Qdrant Cloud instead of the local Qdrant instance:
+
+1. **Get Qdrant Cloud Credentials**:
+   - Sign up at [Qdrant Cloud](https://cloud.qdrant.io/)
+   - Create a new cluster
+   - Get your cluster URL and API key
+
+2. **Configure in the Application**:
+   - Open the application in your browser
+   - Click "Use Qdrant Cloud" in the sidebar
+   - Enter your cluster URL (e.g., `https://your-cluster.qdrant.io`)
+   - Enter your API key
+   - Specify a collection name (default: `documents`)
+   - Click "Connect"
+
+3. **Benefits of Qdrant Cloud**:
+   - **Scalability**: Handle larger datasets and higher traffic
+   - **Performance**: Optimized infrastructure for vector operations
+   - **Reliability**: Managed service with high availability
+   - **Security**: Enterprise-grade security and compliance
+   - **Monitoring**: Built-in analytics and monitoring tools
 
 ## 🛠️ Technology Stack
 
@@ -213,6 +238,7 @@ The Docker setup has been optimized for size and performance:
 - **Extended Format Support**: Added CSV, VTT, and SRT file format processing
 - **Timestamp Control**: Optional timestamp removal for subtitle files to preserve timing information
 - **Hitesh Choudhary Persona**: Integrated authentic Hinglish teaching style with chai analogies and cultural references
+- **Qdrant Cloud Integration**: Optional cloud-based vector database with seamless switching between local and cloud instances
 
 ## 📝 Development
 

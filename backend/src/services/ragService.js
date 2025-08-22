@@ -22,6 +22,8 @@ import { getModelConfig } from '../config/promptConfig.js';
 class RAGService {
   constructor() {
     this.collectionName = process.env.QDRANT_COLLECTION || 'documents';
+    this.isUsingCloud = false;
+    this.cloudConfig = null;
 
     this.embeddings = new GoogleGenerativeAIEmbeddings({
       apiKey: process.env.GOOGLE_API_KEY,
@@ -36,9 +38,70 @@ class RAGService {
     this.chatModel = new ChatGoogleGenerativeAI(getModelConfig());
 
     this.textSplitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 500,
-      chunkOverlap: 200,
+      chunkSize: 1500,
+      chunkOverlap: 300,
+      separators: [
+        '\n\n\n',  // Triple line breaks for major sections
+        '\n\n',    // Double line breaks for paragraphs
+        '\n',      // Single line breaks for lines
+        '. ',      // Sentences
+        '! ',      // Exclamations
+        '? ',      // Questions
+        '; ',      // Semicolons
+        ', ',      // Commas
+        ' ',       // Words
+        ''         // Characters
+      ],
     });
+  }
+
+  // Helper function to process subtitle files with better structure preservation
+  processSubtitleContent(content, fileType, removeTimestamps) {
+    const lines = content.split('\n');
+    const processedLines = [];
+
+    if (fileType === 'vtt') {
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+
+        if (removeTimestamps) {
+          // Skip timestamp lines, WEBVTT header, sequence numbers, and empty lines
+          if (line &&
+            !line.includes('-->') &&
+            !line.startsWith('WEBVTT') &&
+            !line.match(/^\d+$/) &&
+            !line.match(/^\d{2}:\d{2}:\d{2}\.\d{3}/)) {
+            processedLines.push(line);
+          }
+        } else {
+          // Keep all lines except WEBVTT header and empty lines
+          if (line && !line.startsWith('WEBVTT')) {
+            processedLines.push(line);
+          }
+        }
+      }
+    } else if (fileType === 'srt') {
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+
+        if (removeTimestamps) {
+          // Skip timestamp lines, sequence numbers, and empty lines
+          if (line &&
+            !line.includes('-->') &&
+            !line.match(/^\d+$/) &&
+            !line.match(/^\d{2}:\d{2}:\d{2},\d{3}/)) {
+            processedLines.push(line);
+          }
+        } else {
+          // Keep all lines except empty lines
+          if (line) {
+            processedLines.push(line);
+          }
+        }
+      }
+    }
+
+    return processedLines.join('\n');
   }
 
   async processWebUrl(url, opId) {
@@ -150,40 +213,11 @@ class RAGService {
         } else if (originalname.endsWith('.vtt')) {
           emitProgress?.(opId, `Processing VTT subtitle file${removeTimestamps ? ' (removing timestamps)' : ' (keeping timestamps)'}`);
           const vttText = buffer.toString('utf8');
-          // Extract text content from VTT format
-          const lines = vttText.split('\n');
-          const textLines = lines.filter(line => {
-            if (removeTimestamps) {
-              // Skip timestamp lines, WEBVTT header, and empty lines
-              return line.trim() &&
-                !line.includes('-->') &&
-                !line.startsWith('WEBVTT') &&
-                !line.match(/^\d+$/) &&
-                !line.match(/^\d{2}:\d{2}:\d{2}\.\d{3}/);
-            } else {
-              // Keep all lines except WEBVTT header and empty lines
-              return line.trim() && !line.startsWith('WEBVTT');
-            }
-          });
-          textContent = textLines.join('\n');
+          textContent = this.processSubtitleContent(vttText, 'vtt', removeTimestamps);
         } else if (originalname.endsWith('.srt')) {
           emitProgress?.(opId, `Processing SRT subtitle file${removeTimestamps ? ' (removing timestamps)' : ' (keeping timestamps)'}`);
           const srtText = buffer.toString('utf8');
-          // Extract text content from SRT format
-          const lines = srtText.split('\n');
-          const textLines = lines.filter(line => {
-            if (removeTimestamps) {
-              // Skip timestamp lines, numbering, and empty lines
-              return line.trim() &&
-                !line.includes('-->') &&
-                !line.match(/^\d+$/) &&
-                !line.match(/^\d{2}:\d{2}:\d{2},\d{3}/);
-            } else {
-              // Keep all lines except empty lines
-              return line.trim();
-            }
-          });
-          textContent = textLines.join('\n');
+          textContent = this.processSubtitleContent(srtText, 'srt', removeTimestamps);
         } else {
           throw new Error(`Unsupported file type: ${mimetype} (${originalname})`);
         }
@@ -377,6 +411,83 @@ class RAGService {
       };
     } catch (error) {
       logger.error(`Error deleting document ${source}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // Qdrant Cloud connection management
+  async connectToQdrantCloud(url, apiKey, collectionName = 'documents') {
+    try {
+      logger.info('Connecting to Qdrant Cloud...');
+
+      // Test the connection by creating a new vector store instance
+      const cloudVectorStore = new QdrantVectorStore(this.embeddings, {
+        url: url,
+        apiKey: apiKey,
+        collectionName: collectionName,
+      });
+
+      // Test the connection by trying to list collections
+      await cloudVectorStore.client.getCollections();
+
+      // If successful, update the current vector store
+      this.vectorStore = cloudVectorStore;
+      this.collectionName = collectionName;
+      this.isUsingCloud = true;
+      this.cloudConfig = { url, apiKey, collectionName };
+
+      logger.info(`Successfully connected to Qdrant Cloud at ${url}`);
+
+      return {
+        success: true,
+        message: 'Successfully connected to Qdrant Cloud',
+        url: url,
+        collectionName: collectionName
+      };
+    } catch (error) {
+      logger.error(`Failed to connect to Qdrant Cloud: ${error.message}`);
+      throw new Error(`Failed to connect to Qdrant Cloud: ${error.message}`);
+    }
+  }
+
+  async disconnectFromQdrantCloud() {
+    try {
+      logger.info('Disconnecting from Qdrant Cloud...');
+
+      // Reconnect to local Qdrant
+      this.vectorStore = new QdrantVectorStore(this.embeddings, {
+        url: process.env.QDRANT_URL,
+        collectionName: process.env.QDRANT_COLLECTION || 'documents',
+      });
+
+      this.isUsingCloud = false;
+      this.cloudConfig = null;
+      this.collectionName = process.env.QDRANT_COLLECTION || 'documents';
+
+      logger.info('Successfully disconnected from Qdrant Cloud');
+
+      return {
+        success: true,
+        message: 'Successfully disconnected from Qdrant Cloud'
+      };
+    } catch (error) {
+      logger.error(`Failed to disconnect from Qdrant Cloud: ${error.message}`);
+      throw new Error(`Failed to disconnect from Qdrant Cloud: ${error.message}`);
+    }
+  }
+
+  async getQdrantCloudStatus() {
+    try {
+      return {
+        success: true,
+        isUsingCloud: this.isUsingCloud,
+        config: this.cloudConfig ? {
+          url: this.cloudConfig.url,
+          collectionName: this.cloudConfig.collectionName
+        } : null
+      };
+    } catch (error) {
+      logger.error(`Error getting Qdrant Cloud status: ${error.message}`);
       throw error;
     }
   }

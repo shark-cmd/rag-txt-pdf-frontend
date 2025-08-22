@@ -132,6 +132,38 @@ async function initializeApp() {
       }
     });
 
+    // Qdrant Cloud connection endpoints
+    app.post('/api/qdrant-cloud/connect', async (req, res, next) => {
+      try {
+        const { url, apiKey, collectionName } = req.body;
+        if (!url || !apiKey) {
+          return res.status(400).json({ error: 'URL and API Key are required' });
+        }
+        const result = await ragService.connectToQdrantCloud(url, apiKey, collectionName);
+        res.json(result);
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    app.post('/api/qdrant-cloud/disconnect', async (req, res, next) => {
+      try {
+        const result = await ragService.disconnectFromQdrantCloud();
+        res.json(result);
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    app.get('/api/qdrant-cloud/status', async (req, res, next) => {
+      try {
+        const result = await ragService.getQdrantCloudStatus();
+        res.json(result);
+      } catch (error) {
+        next(error);
+      }
+    });
+
     // Error handling middleware
     app.use((err, req, res, next) => {
       logger.error(err.stack);
