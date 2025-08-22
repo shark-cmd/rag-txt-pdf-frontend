@@ -8,7 +8,7 @@ class WebsiteCrawler {
         this.visitedUrls = new Set();
         this.queue = [];
         this.maxPages = 50; // Limit to prevent infinite crawling
-        this.delay = 1000; // 1 second delay between requests
+        this.delayMs = 1000; // 1 second delay between requests
         this.userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
     }
 
@@ -54,7 +54,7 @@ class WebsiteCrawler {
 
                     // Rate limiting
                     if (this.queue.length > 0) {
-                        await this.delay(1000);
+                        await this.delay(this.delayMs);
                     }
 
                 } catch (error) {

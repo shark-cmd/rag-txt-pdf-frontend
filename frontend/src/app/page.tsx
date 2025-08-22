@@ -90,7 +90,15 @@ const Home: NextPage = () => {
       setError(null);
     } catch (err: unknown) {
       console.error('Failed to delete document:', err);
-      setError('Failed to delete document. Please try again.');
+      let errorMessage = 'Failed to delete document. Please try again.';
+
+      if (axios.isAxiosError(err) && err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
     }
   };
 
@@ -269,16 +277,11 @@ const Home: NextPage = () => {
   const progressPercentage = progressLines.length > 0 ? (completedCount / progressLines.length) * 100 : 0;
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 overflow-hidden">
-      {/* Background Effects */}
-      <div className="absolute inset-0 opacity-20" style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fillRule='evenodd'%3E%3Cg fill='%239C92AC' fillOpacity='0.05'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-      }} />
-
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white">
       {error && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 p-4 bg-red-500/90 backdrop-blur-sm text-white rounded-lg border border-red-400/50 max-w-md text-center">
+        <div className="fixed top-4 right-4 z-50 bg-red-500/90 backdrop-blur-sm border border-red-400/50 rounded-lg p-4 max-w-md">
           <div className="flex items-center justify-between">
-            <span>{error}</span>
+            <span className="text-sm">{error}</span>
             <button
               onClick={() => setError(null)}
               className="ml-4 text-white/80 hover:text-white"
@@ -291,7 +294,7 @@ const Home: NextPage = () => {
 
       <div className="flex h-full relative">
         {/* Left Sidebar */}
-        <aside className="w-80 p-6 border-r border-white/10 relative">
+        <aside className="w-96 p-6 border-r border-white/10 relative flex-shrink-0">
           {/* Glassmorphism Background */}
           <div className="absolute inset-0 bg-white/5 backdrop-blur-xl border-r border-white/10" />
 
@@ -385,58 +388,54 @@ const Home: NextPage = () => {
             <div className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-lg p-4">
               <div className="flex items-center gap-2 text-white mb-3">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
                 <h3 className="font-semibold">Progress</h3>
-                <span className="ml-auto text-xs bg-white/10 text-white border border-white/20 rounded-full px-2 py-1">
-                  {completedCount}/{progressLines.length}
-                </span>
               </div>
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm text-white/80">
-                    <span>Overall Progress</span>
-                    <span>{Math.round(progressPercentage)}%</span>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {progressLines.map((line, index) => (
+                  <div key={index} className="text-xs text-white/70 bg-white/5 rounded px-2 py-1">
+                    {line}
                   </div>
-                  <div className="w-full bg-white/10 rounded-full h-2">
-                    <div
-                      className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${progressPercentage}%` }}
-                    />
-                  </div>
-                </div>
+                ))}
+                {progressLines.length === 0 && (
+                  <div className="text-xs text-white/40 italic">No recent activity</div>
+                )}
+              </div>
+            </div>
 
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {progressLines.length === 0 ? (
-                    <div className="text-white/40 text-sm">No active operations.</div>
-                  ) : (
-                    progressLines.map((line, i) => (
-                      <div key={i} className="flex items-center gap-3 text-sm">
-                        {line.includes('Done') || line.includes('complete') ? (
-                          <svg className="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        ) : line.includes('Working') || line.includes('Processing') ? (
-                          <svg className="w-4 h-4 text-blue-400 flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                        ) : (
-                          <div className="w-4 h-4 rounded-full border-2 border-white/20 flex-shrink-0" />
-                        )}
-                        <span className={`flex-1 ${line.includes('Done') || line.includes('complete')
-                          ? 'text-green-400'
-                          : line.includes('Working') || line.includes('Processing')
-                            ? 'text-blue-400'
-                            : 'text-white/60'
-                          }`}>
-                          {line}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
+            {/* File Upload Section */}
+            <div className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-lg p-4">
+              <div className="flex items-center gap-2 text-white mb-3">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <h3 className="font-semibold">Upload File</h3>
               </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt,.pdf,.doc,.docx,.md"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoadingFile}
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white border-0 rounded-md py-2 px-4 transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isLoadingFile ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                )}
+                {isLoadingFile ? 'Uploading...' : 'Upload File'}
+              </button>
             </div>
 
             {/* Sources Section */}
@@ -492,46 +491,11 @@ const Home: NextPage = () => {
                 )}
               </div>
             </div>
-
-            {/* File Upload Section */}
-            <div className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="flex items-center gap-2 text-white mb-3">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                <h3 className="font-semibold">Upload File</h3>
-              </div>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                accept=".pdf,.txt,.docx"
-                disabled={isLoadingFile}
-                className="hidden"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isLoadingFile}
-                className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white border-0 rounded-md py-2 px-4 transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {isLoadingFile ? (
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                )}
-                {isLoadingFile ? 'Uploading...' : 'Upload File'}
-              </button>
-            </div>
           </div>
         </aside>
 
         {/* Main Chat Area */}
-        <main className="flex-1 flex flex-col relative">
+        <main className="flex-1 flex flex-col relative min-w-0">
           {/* Header */}
           <header className="p-6 border-b border-white/10 bg-white/5 backdrop-blur-sm">
             <div className="flex items-center justify-between">
@@ -626,7 +590,7 @@ const Home: NextPage = () => {
                           />
                         ))}
                       </div>
-                      <span className="text-sm text-white/60">AI is thinking...</span>
+                      <span className="text-sm">Thinking...</span>
                     </div>
                   </div>
                 </div>
@@ -637,26 +601,32 @@ const Home: NextPage = () => {
           {/* Input Area */}
           <div className="p-6 border-t border-white/10 bg-white/5 backdrop-blur-sm">
             <div className="max-w-4xl mx-auto">
-              <div className="flex gap-3">
-                <div className="flex-1 relative">
-                  <textarea
-                    value={chatMessage}
-                    onChange={(e) => setChatMessage(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                    placeholder="Type your message..."
-                    className="w-full min-h-[50px] max-h-32 bg-white/10 border border-white/20 text-white placeholder:text-white/40 focus:border-blue-400 focus:ring-blue-400/20 rounded-lg p-3 resize-none pr-12"
-                    disabled={isLoadingChat}
-                  />
-                </div>
-
+              <div className="flex gap-4">
+                <input
+                  type="text"
+                  placeholder="Ask a question about your documents..."
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                  className="flex-1 bg-white/5 border border-white/20 text-white placeholder:text-white/40 focus:border-blue-400 focus:ring-blue-400/20 rounded-lg px-4 py-3"
+                  disabled={isLoadingChat}
+                />
                 <button
                   onClick={handleSendMessage}
                   disabled={!chatMessage.trim() || isLoadingChat}
-                  className="px-6 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0 rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0 rounded-lg px-6 py-3 transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
+                  {isLoadingChat ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                  )}
+                  Send
                 </button>
               </div>
             </div>

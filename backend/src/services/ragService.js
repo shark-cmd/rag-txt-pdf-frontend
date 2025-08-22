@@ -276,18 +276,36 @@ Question: {input}`);
       });
 
       if (!allPoints.points) {
-        throw new Error('No documents found');
+        throw new Error('No documents found in database');
       }
 
-      // Find points that match the source
+      // Find points that match the source (with flexible matching)
       const pointsToDelete = [];
+      const normalizedSource = decodeURIComponent(source).toLowerCase();
+
       for (const point of allPoints.points) {
-        if (point.payload && point.payload.metadata && point.payload.metadata.source === source) {
-          pointsToDelete.push(point.id);
+        if (point.payload && point.payload.metadata && point.payload.metadata.source) {
+          const storedSource = decodeURIComponent(point.payload.metadata.source).toLowerCase();
+
+          // Try exact match first, then try without trailing slashes
+          if (storedSource === normalizedSource ||
+            storedSource.replace(/\/$/, '') === normalizedSource.replace(/\/$/, '') ||
+            storedSource === normalizedSource.replace(/\/$/, '') ||
+            storedSource.replace(/\/$/, '') === normalizedSource) {
+            pointsToDelete.push(point.id);
+          }
         }
       }
 
       if (pointsToDelete.length === 0) {
+        // Log available sources for debugging
+        const availableSources = new Set();
+        for (const point of allPoints.points) {
+          if (point.payload && point.payload.metadata && point.payload.metadata.source) {
+            availableSources.add(point.payload.metadata.source);
+          }
+        }
+        logger.warn(`Available sources: ${Array.from(availableSources).slice(0, 5).join(', ')}...`);
         throw new Error(`No documents found with source: ${source}`);
       }
 

@@ -39,64 +39,51 @@ The application features a stunning glassmorphism design inspired by modern AI i
 ### Prerequisites
 
 - Docker and Docker Compose
-- Google API key for Gemini AI
+- Valid Google API key for Gemini AI
+- Node.js 18+ (for local development)
 
 ### Environment Setup
 
-1. Create a `.env` file in the root directory:
-```bash
-GOOGLE_API_KEY=your_google_api_key_here
-QDRANT_URL=http://localhost:6333
-QDRANT_COLLECTION=documents
-PORT=3000
-```
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd chai-rag-feat-add-nextjs-frontend
+   ```
 
-2. Start all services:
-```bash
-docker compose up -d --build
-```
+2. **Set up environment variables**:
+   Create `backend/.env`:
+   ```env
+   GOOGLE_API_KEY=your_google_api_key_here
+   QDRANT_URL=http://qdrant:6333
+   QDRANT_COLLECTION=documents
+   PORT=3000
+   ```
 
-3. Access the application:
-- Frontend: http://localhost:3001
-- Backend API: http://localhost:3000
-- Qdrant Vector DB: http://localhost:6333
+3. **Start the application**:
+   ```bash
+   # Build and start all services
+   docker compose build
+   docker compose up -d
+   ```
 
-## 📖 Usage
+4. **Access the application**:
+   - Frontend: http://localhost:3001
+   - Backend API: http://localhost:3000
+   - Qdrant Vector DB: http://localhost:6333
 
-### Adding Content
+## 🛠️ Technology Stack
 
-1. **Text Input**: Type or paste text directly into the "Add Text" section
-2. **Website Crawling**: Enter a URL to recursively crawl and index all pages
-3. **File Upload**: Upload PDF, DOCX, or TXT files from the bottom of the sidebar
+### Backend
+- **Node.js & Express**: Fast, unopinionated web framework
+- **LangChain**: LLM framework for RAG implementation
+- **Google Gemini AI**: Advanced language model for embeddings and chat
+- **Qdrant**: High-performance vector database
+- **Cheerio**: Server-side HTML parsing for web crawling
+- **pdf-parse & mammoth**: Document parsing for PDF and DOCX files
 
-### Managing Sources
-
-- **View Sources**: All indexed documents appear in the "Sources" panel
-- **Refresh**: Click the refresh button to update the document list
-- **Delete**: Click the ✗ button next to any source to remove it
-- **Progress Tracking**: Real-time updates show ingestion progress
-
-### Chat Interface
-
-- **Ask Questions**: Type natural language questions about your knowledge base
-- **Source Attribution**: See which documents were used to generate answers
-- **Real-time Responses**: Get instant AI-powered responses with source links
-
-## 🔧 Technical Details
-
-### Backend Services
-
-- **Express.js API**: RESTful endpoints for ingestion and querying
-- **LangChain**: RAG pipeline with Google Gemini integration
-- **Qdrant Vector Store**: High-performance vector database
-- **Server-Sent Events**: Real-time progress updates
-- **File Processing**: Direct parsing of PDF, DOCX, and TXT files
-- **Web Crawling**: Recursive crawling with robots.txt support and rate limiting
-
-### Frontend Features
-
-- **Next.js 14**: Modern React framework with App Router
-- **TypeScript**: Full type safety throughout the application
+### Frontend
+- **Next.js 15**: React framework with App Router
+- **TypeScript**: Type-safe JavaScript development
 - **Tailwind CSS**: Utility-first styling with custom design system
 - **Glassmorphism**: Modern UI effects with backdrop blur and transparency
 - **Responsive Design**: Mobile-first approach with adaptive layouts
@@ -123,6 +110,7 @@ The recursive website crawler includes:
 - **Page Limits**: Maximum 50 pages per crawl to prevent infinite loops
 - **Content Extraction**: Cleans HTML and extracts meaningful text content
 - **Error Handling**: Gracefully handles failed requests and continues crawling
+- **Flexible URL Matching**: Handles URL encoding variations and trailing slashes
 
 ## 📊 Progress Tracking
 
@@ -140,9 +128,10 @@ The Sources panel provides:
 
 - **Document Overview**: Shows titles, URLs, and chunk counts
 - **Clickable Links**: Direct access to web sources
-- **Delete Functionality**: Remove individual documents from the database
+- **Delete Functionality**: Remove individual documents from the database with flexible URL matching
 - **Refresh Capability**: Manual refresh of the document list
 - **Loading States**: Visual feedback during operations
+- **Error Handling**: Improved error messages for failed operations
 
 ## 🐳 Docker Configuration
 
@@ -183,6 +172,7 @@ The Docker setup has been optimized for size and performance:
 - **Content Cleaning**: Removes scripts, styles, and navigation elements
 - **Text Extraction**: Converts HTML to clean, readable text
 - **Metadata Preservation**: Maintains source URLs and page titles
+- **Robust Error Handling**: Continues crawling even if individual pages fail
 
 ### Text Processing
 - **Direct Input**: Immediate processing of typed text
@@ -197,6 +187,23 @@ The Docker setup has been optimized for size and performance:
 - **Caching**: Intelligent caching of frequently accessed data
 - **Background Processing**: Non-blocking ingestion operations
 
+## 🔧 Recent Fixes & Improvements
+
+### Crawler Issues Resolved
+- **Fixed delay function conflict**: Resolved naming conflict between delay property and method
+- **Improved error handling**: Better error messages and graceful failure handling
+- **Enhanced URL matching**: Flexible matching for document deletion with URL variations
+
+### Frontend Enhancements
+- **Restored Sources Panel**: Added back the sources management panel in the sidebar
+- **Better Error Display**: Improved error message formatting and user feedback
+- **Enhanced Progress Tracking**: Real-time updates with detailed status information
+
+### Backend Improvements
+- **Flexible Document Deletion**: Handles URL encoding variations and trailing slashes
+- **Better Debugging**: Logs available sources when deletion fails
+- **Robust URL Matching**: Multiple matching strategies for document identification
+
 ## 📝 Development
 
 ### Local Development
@@ -204,9 +211,8 @@ The Docker setup has been optimized for size and performance:
 1. Clone the repository
 2. Install dependencies: `npm install` in both frontend and backend
 3. Set up environment variables
-4. Run development servers:
-   - Frontend: `npm run dev` (port 3001)
-   - Backend: `npm run dev` (port 3000)
+4. Start services: `docker compose up -d`
+5. Access the application at http://localhost:3001
 
 ### Building for Production
 
@@ -214,16 +220,23 @@ The Docker setup has been optimized for size and performance:
 # Build all services
 docker compose build
 
-# Start production environment
-docker compose up -d
+# Start in production mode
+docker compose -f docker-compose.yml up -d
 ```
+
+### Troubleshooting
+
+- **Crawler Issues**: Check the backend logs for detailed error messages
+- **Document Deletion**: Verify URL encoding and try refreshing the sources list
+- **API Errors**: Check the health endpoint at `/api/health`
+- **Vector Database**: Ensure Qdrant is running and accessible
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests if applicable
+4. Test thoroughly
 5. Submit a pull request
 
 ## 📄 License
@@ -232,13 +245,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🙏 Acknowledgments
 
-- **Google Gemini**: AI model and embeddings
-- **LangChain**: RAG framework and components
-- **Qdrant**: Vector database
-- **Next.js**: React framework
-- **Tailwind CSS**: Styling framework
-- **FIGMA_SAMPLE**: Beautiful UI design inspiration
-
----
-
-**Note**: This application is designed for personal use and knowledge management. Ensure you have proper permissions when crawling websites and respect robots.txt files.
+- **Google Gemini AI** for powerful language model capabilities
+- **LangChain** for the excellent RAG framework
+- **Qdrant** for high-performance vector storage
+- **Next.js** for the modern React framework
+- **Tailwind CSS** for the utility-first styling approach
