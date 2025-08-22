@@ -48,6 +48,9 @@ const Home: NextPage = () => {
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
 
+  // State for timestamp removal
+  const [removeTimestamps, setRemoveTimestamps] = useState(false);
+
   useEffect(() => {
     return () => {
       // cleanup SSE on unmount
@@ -220,16 +223,16 @@ const Home: NextPage = () => {
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || !event.target.files[0]) return;
-    const file = event.target.files[0];
+    const files = Array.from(event.target.files);
     setIsLoadingFile(true);
     setError(null);
     const opId = createOpId();
     startProgressStream(opId);
     try {
       const formData = new FormData();
-      formData.append('document', file);
+      files.forEach(file => formData.append('document', file));
       await axios.post(`${API_URL}/documents`, formData, {
-        params: { opId },
+        params: { opId, removeTimestamps }, // Pass removeTimestamps
         headers: { 'Content-Type': 'multipart/form-data' },
       });
     } catch (err) {
@@ -410,12 +413,33 @@ const Home: NextPage = () => {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                <h3 className="font-semibold">Upload File</h3>
+                <h3 className="font-semibold">Upload Files</h3>
               </div>
+
+              {/* Timestamp Removal Toggle */}
+              <div className="mb-3 p-2 bg-white/5 rounded border border-white/10">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-white/80 cursor-pointer">
+                    Remove timestamps from subtitle files
+                  </label>
+                  <input
+                    type="checkbox"
+                    id="removeTimestamps"
+                    checked={removeTimestamps}
+                    onChange={(e) => setRemoveTimestamps(e.target.checked)}
+                    className="w-4 h-4 text-purple-600 bg-white/10 border-white/20 rounded focus:ring-purple-500 focus:ring-2"
+                  />
+                </div>
+                <p className="text-xs text-white/60 mt-1">
+                  Keep timestamps for valuable timing information
+                </p>
+              </div>
+
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".txt,.pdf,.doc,.docx,.md"
+                multiple
+                accept=".txt,.pdf,.doc,.docx,.md,.csv,.vtt,.srt"
                 onChange={handleFileChange}
                 className="hidden"
               />
@@ -434,8 +458,21 @@ const Home: NextPage = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
                 )}
-                {isLoadingFile ? 'Uploading...' : 'Upload File'}
+                {isLoadingFile ? 'Uploading...' : 'Upload Files'}
               </button>
+
+              {/* Supported Formats */}
+              <div className="mt-3 text-xs text-white/60">
+                <p className="mb-2 font-medium">Supported formats:</p>
+                <div className="grid grid-cols-2 gap-1">
+                  <span>• PDF (.pdf)</span>
+                  <span>• DOCX (.docx)</span>
+                  <span>• Text (.txt)</span>
+                  <span>• Markdown (.md)</span>
+                  <span>• CSV (.csv)</span>
+                  <span>• Subtitles (.vtt, .srt)</span>
+                </div>
+              </div>
             </div>
 
             {/* Sources Section */}

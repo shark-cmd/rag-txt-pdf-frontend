@@ -5,7 +5,8 @@ A beautiful, modern RAG (Retrieval-Augmented Generation) application that allows
 ## ✨ Features
 
 - **Beautiful Modern UI**: Glassmorphism design with gradient backgrounds and smooth animations
-- **Multi-format Document Ingestion**: Upload PDF, DOCX, and TXT files
+- **Multi-format Document Ingestion**: Upload PDF, DOCX, TXT, MD, CSV, VTT, and SRT files
+- **Multiple File Upload**: Process multiple files simultaneously for efficient batch processing
 - **Recursive Website Crawling**: Automatically discover and index all sub-pages of a website
 - **Real-time Progress Tracking**: Live updates during ingestion with Server-Sent Events (SSE)
 - **Document Management**: View, refresh, and delete sources from the database
@@ -164,7 +165,10 @@ The Docker setup has been optimized for size and performance:
 ### File Processing
 - **PDF**: Direct text extraction using pdf-parse
 - **DOCX**: Raw text extraction using mammoth
-- **TXT**: UTF-8 text processing
+- **TXT/MD**: UTF-8 text processing for plain text and markdown files
+- **CSV**: Tabular data conversion to readable text format
+- **VTT/SRT**: Subtitle file processing with optional timestamp removal
+- **Multiple Files**: Batch processing of up to 10 files simultaneously
 - **Chunking**: 1000-character chunks with 200-character overlap
 
 ### Website Crawling
@@ -203,6 +207,9 @@ The Docker setup has been optimized for size and performance:
 - **Flexible Document Deletion**: Handles URL encoding variations and trailing slashes
 - **Better Debugging**: Logs available sources when deletion fails
 - **Robust URL Matching**: Multiple matching strategies for document identification
+- **Multiple File Processing**: Support for batch uploading and processing up to 10 files
+- **Extended Format Support**: Added CSV, VTT, and SRT file format processing
+- **Timestamp Control**: Optional timestamp removal for subtitle files to preserve timing information
 
 ## 📝 Development
 

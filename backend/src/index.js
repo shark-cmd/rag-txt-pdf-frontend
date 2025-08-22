@@ -41,16 +41,19 @@ async function initializeApp() {
     // SSE channel for progress
     app.get('/api/progress/:opId', sseHandler);
 
-    // Ingest a document from file upload
-    app.post('/api/documents', upload.single('document'), async (req, res, next) => {
+    // Ingest documents from file upload
+    app.post('/api/documents', upload.array('document', 10), async (req, res, next) => {
       try {
-        const { opId } = req.query;
-        if (!req.file) {
-          return res.status(400).json({ error: 'No file uploaded' });
+        const { opId, removeTimestamps } = req.query;
+        if (!req.files || req.files.length === 0) {
+          return res.status(400).json({ error: 'No files uploaded' });
         }
-        emitProgress?.(opId, `Uploading file: ${req.file.originalname}`);
-        const result = await ragService.processFile(req.file, opId);
-        emitProgress?.(opId, `File processed: ${req.file.originalname}`, result);
+
+        const fileNames = req.files.map(file => file.originalname).join(', ');
+        emitProgress?.(opId, `Uploading ${req.files.length} files: ${fileNames}`);
+
+        const result = await ragService.processFile(req.files, opId, removeTimestamps === 'true');
+        emitProgress?.(opId, `Files processed: ${fileNames}`, result);
         res.status(201).json(result);
       } catch (error) {
         next(error);

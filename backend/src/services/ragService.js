@@ -110,50 +110,112 @@ class RAGService {
     }
   }
 
-  async processFile(file, opId) {
+  async processFile(files, opId, removeTimestamps = false) {
     try {
-      logger.info(`Processing file: ${file.originalname}`);
-      emitProgress?.(opId, `Reading file: ${file.originalname}`);
+      const fileArray = Array.isArray(files) ? files : [files];
+      let totalChunks = 0;
+      const allSources = [];
 
-      const { mimetype, buffer, originalname } = file;
-      let textContent = '';
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        const { originalname, mimetype, buffer } = file;
 
-      if (mimetype === 'application/pdf') {
-        emitProgress?.(opId, 'Extracting text from PDF');
-        // Dynamic import from the library path to avoid module-side file reads
-        const pdfModule = await import('pdf-parse/lib/pdf-parse.js');
-        const pdfParse = pdfModule.default || pdfModule;
-        const data = await pdfParse(buffer);
-        textContent = data.text || '';
-      } else if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-        emitProgress?.(opId, 'Extracting text from DOCX');
-        const result = await mammoth.extractRawText({ buffer });
-        textContent = result.value || '';
-      } else if (mimetype === 'text/plain') {
-        emitProgress?.(opId, 'Reading text file');
-        textContent = buffer.toString('utf8');
-      } else {
-        throw new Error('Unsupported file type');
+        emitProgress?.(opId, `Processing file ${i + 1}/${fileArray.length}: ${originalname}`);
+
+        let textContent = '';
+
+        if (mimetype === 'application/pdf') {
+          emitProgress?.(opId, 'Extracting text from PDF');
+          // Dynamic import from the library path to avoid module-side file reads
+          const pdfModule = await import('pdf-parse/lib/pdf-parse.js');
+          const pdfParse = pdfModule.default || pdfModule;
+          const data = await pdfParse(buffer);
+          textContent = data.text || '';
+        } else if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+          emitProgress?.(opId, 'Extracting text from DOCX');
+          const result = await mammoth.extractRawText({ buffer });
+          textContent = result.value || '';
+        } else if (mimetype === 'text/plain' || originalname.endsWith('.txt') || originalname.endsWith('.md')) {
+          emitProgress?.(opId, 'Reading text file');
+          textContent = buffer.toString('utf8');
+        } else if (mimetype === 'text/csv' || originalname.endsWith('.csv')) {
+          emitProgress?.(opId, 'Processing CSV file');
+          const csvText = buffer.toString('utf8');
+          // Convert CSV to readable text format
+          const lines = csvText.split('\n');
+          const processedLines = lines.map(line => {
+            // Split by comma and clean up each field
+            const fields = line.split(',').map(field => field.trim().replace(/"/g, ''));
+            return fields.join(' | ');
+          });
+          textContent = processedLines.join('\n');
+        } else if (originalname.endsWith('.vtt')) {
+          emitProgress?.(opId, `Processing VTT subtitle file${removeTimestamps ? ' (removing timestamps)' : ' (keeping timestamps)'}`);
+          const vttText = buffer.toString('utf8');
+          // Extract text content from VTT format
+          const lines = vttText.split('\n');
+          const textLines = lines.filter(line => {
+            if (removeTimestamps) {
+              // Skip timestamp lines, WEBVTT header, and empty lines
+              return line.trim() &&
+                !line.includes('-->') &&
+                !line.startsWith('WEBVTT') &&
+                !line.match(/^\d+$/) &&
+                !line.match(/^\d{2}:\d{2}:\d{2}\.\d{3}/);
+            } else {
+              // Keep all lines except WEBVTT header and empty lines
+              return line.trim() && !line.startsWith('WEBVTT');
+            }
+          });
+          textContent = textLines.join('\n');
+        } else if (originalname.endsWith('.srt')) {
+          emitProgress?.(opId, `Processing SRT subtitle file${removeTimestamps ? ' (removing timestamps)' : ' (keeping timestamps)'}`);
+          const srtText = buffer.toString('utf8');
+          // Extract text content from SRT format
+          const lines = srtText.split('\n');
+          const textLines = lines.filter(line => {
+            if (removeTimestamps) {
+              // Skip timestamp lines, numbering, and empty lines
+              return line.trim() &&
+                !line.includes('-->') &&
+                !line.match(/^\d+$/) &&
+                !line.match(/^\d{2}:\d{2}:\d{2},\d{3}/);
+            } else {
+              // Keep all lines except empty lines
+              return line.trim();
+            }
+          });
+          textContent = textLines.join('\n');
+        } else {
+          throw new Error(`Unsupported file type: ${mimetype} (${originalname})`);
+        }
+
+        if (!textContent || !textContent.trim()) {
+          emitProgress?.(opId, `Warning: No extractable content found in ${originalname}`);
+          continue;
+        }
+
+        emitProgress?.(opId, `Chunking content from ${originalname}`);
+        const docs = [
+          new Document({ pageContent: textContent, metadata: { source: originalname } }),
+        ];
+        const chunks = await this.textSplitter.splitDocuments(docs);
+        totalChunks += chunks.length;
+        allSources.push({ file: originalname });
+
+        emitProgress?.(opId, `Storing ${chunks.length} chunks from ${originalname}`);
+        await this.vectorStore.addDocuments(chunks);
       }
 
-      if (!textContent || !textContent.trim()) {
-        throw new Error('No extractable text content found in file');
+      if (totalChunks === 0) {
+        throw new Error('No extractable text content found in any of the uploaded files');
       }
 
-      emitProgress?.(opId, 'Chunking content');
-      const docs = [
-        new Document({ pageContent: textContent, metadata: { source: originalname } }),
-      ];
-      const chunks = await this.textSplitter.splitDocuments(docs);
-
-      emitProgress?.(opId, `Storing ${chunks.length} chunks`);
-      await this.vectorStore.addDocuments(chunks);
-
-      logger.info(`Successfully processed and stored content from ${originalname}`);
-      emitDone?.(opId, { chunksAdded: chunks.length, sources: [{ file: originalname }] });
-      return { success: true, chunksAdded: chunks.length, sources: [{ file: originalname }] };
+      logger.info(`Successfully processed and stored content from ${fileArray.length} files`);
+      emitDone?.(opId, { chunksAdded: totalChunks, sources: allSources });
+      return { success: true, chunksAdded: totalChunks, sources: allSources };
     } catch (error) {
-      logger.error(`Error processing file ${file.originalname}: ${error.message}`);
+      logger.error(`Error processing files: ${error.message}`);
       emitProgress?.(opId, `Error: ${error.message}`);
       throw error;
     }
