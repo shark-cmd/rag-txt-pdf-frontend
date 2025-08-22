@@ -16,6 +16,8 @@ import mammoth from 'mammoth';
 import logger from '../config/logger.js';
 import { emitProgress, emitDone } from './progress.js';
 import websiteCrawler from './websiteCrawler.js';
+import { SYSTEM_PROMPT, QUERY_PROMPT } from '../prompts/systemPrompt.js';
+import { getModelConfig } from '../config/promptConfig.js';
 
 class RAGService {
   constructor() {
@@ -31,14 +33,10 @@ class RAGService {
       collectionName: this.collectionName,
     });
 
-    this.chatModel = new ChatGoogleGenerativeAI({
-      apiKey: process.env.GOOGLE_API_KEY,
-      model: 'gemini-1.5-flash',
-      temperature: 0.3,
-    });
+    this.chatModel = new ChatGoogleGenerativeAI(getModelConfig());
 
     this.textSplitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 1000,
+      chunkSize: 500,
       chunkOverlap: 200,
     });
   }
@@ -244,13 +242,7 @@ class RAGService {
       logger.info(`Executing query: ${query}`);
       const retriever = this.vectorStore.asRetriever();
 
-      const prompt = ChatPromptTemplate.fromTemplate(`Answer the following question based only on the provided context:
-
-<context>
-{context}
-</context>
-
-Question: {input}`);
+      const prompt = ChatPromptTemplate.fromTemplate(QUERY_PROMPT);
 
       const documentChain = await createStuffDocumentsChain({
         llm: this.chatModel,

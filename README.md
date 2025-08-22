@@ -1,16 +1,18 @@
-# Personal NotebookLM - AI-Powered Knowledge Assistant
+# Personal NotebookLM - Hitesh Choudhary Edition
 
-A beautiful, modern RAG (Retrieval-Augmented Generation) application that allows you to create your own personal knowledge base by ingesting documents, websites, and text, then querying it with natural language.
+A beautiful, modern RAG (Retrieval-Augmented Generation) application featuring Hitesh Choudhary's unique teaching style and personality. This AI-powered knowledge assistant helps you create your own personal knowledge base by ingesting documents, websites, and text, then querying it with natural language in Hitesh's characteristic Hinglish communication style.
 
 ## ✨ Features
 
+- **Hitesh Choudhary's Teaching Style**: Authentic Hinglish communication with chai analogies and cultural references
+- **No-Spoon-Feeding Approach**: Guidance-based learning that encourages independent problem-solving
 - **Beautiful Modern UI**: Glassmorphism design with gradient backgrounds and smooth animations
 - **Multi-format Document Ingestion**: Upload PDF, DOCX, TXT, MD, CSV, VTT, and SRT files
 - **Multiple File Upload**: Process multiple files simultaneously for efficient batch processing
 - **Recursive Website Crawling**: Automatically discover and index all sub-pages of a website
 - **Real-time Progress Tracking**: Live updates during ingestion with Server-Sent Events (SSE)
 - **Document Management**: View, refresh, and delete sources from the database
-- **Natural Language Queries**: Ask questions about your knowledge base
+- **Natural Language Queries**: Ask questions about your knowledge base in conversational Hinglish
 - **Source Attribution**: See which documents were used to generate answers
 - **Responsive Design**: Works seamlessly on desktop and mobile devices
 
@@ -210,6 +212,7 @@ The Docker setup has been optimized for size and performance:
 - **Multiple File Processing**: Support for batch uploading and processing up to 10 files
 - **Extended Format Support**: Added CSV, VTT, and SRT file format processing
 - **Timestamp Control**: Optional timestamp removal for subtitle files to preserve timing information
+- **Hitesh Choudhary Persona**: Integrated authentic Hinglish teaching style with chai analogies and cultural references
 
 ## 📝 Development
 
