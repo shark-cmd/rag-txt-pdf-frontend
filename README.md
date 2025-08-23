@@ -55,9 +55,11 @@ The application features a stunning glassmorphism design with recent improvement
 
 ### Prerequisites
 
-- Docker and Docker Compose
+- Docker and Docker Compose (for local development)
 - Valid Google API key for Gemini AI
 - Node.js 18+ (for local development)
+- Supabase account (for chat persistence)
+- Qdrant Cloud account (for production deployment)
 
 ### Environment Setup
 
@@ -93,6 +95,41 @@ The application features a stunning glassmorphism design with recent improvement
    - Frontend: http://localhost:3001
    - Backend API: http://localhost:3000
    - Qdrant Vector DB: http://localhost:6333
+
+## 🌐 Production Deployment
+
+### Vercel Deployment (Recommended)
+
+For production deployment, we recommend using **Vercel for the frontend** and **Railway for the backend**:
+
+1. **Frontend on Vercel**: 
+   - Automatic deployments from Git
+   - Global CDN and edge functions
+   - Built-in analytics and monitoring
+
+2. **Backend on Railway**:
+   - Easy Express.js deployment
+   - Automatic scaling
+   - Cost-effective for APIs
+
+3. **Database on Qdrant Cloud**:
+   - Managed vector database
+   - Better performance than local instances
+   - Enterprise-grade reliability
+
+📖 **Complete deployment guide**: See [DEPLOYMENT.md](./DEPLOYMENT.md) for step-by-step instructions.
+
+### Quick Deploy Commands
+
+```bash
+# Deploy backend to Railway
+cd backend
+railway up
+
+# Deploy frontend to Vercel
+cd frontend
+vercel --prod
+```
 
 ### Qdrant Cloud Configuration (Optional)
 
