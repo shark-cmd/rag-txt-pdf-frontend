@@ -13,6 +13,6 @@
         }
     },
     "env": {
-        "NEXT_PUBLIC_BACKEND_URL": "@backend_url"
+        "NEXT_PUBLIC_BACKEND_URL": "rag-personallm-plus-production.up.railway.app"
     }
 }

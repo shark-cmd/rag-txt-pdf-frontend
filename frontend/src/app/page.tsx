@@ -536,7 +536,7 @@ const Home: NextPage = () => {
                   </button>
                 </div>
                 <div className="text-xs text-white/60 mb-2">
-                  Excluded sources won't be used in AI responses
+                  Excluded sources won&apos;t be used in AI responses
                 </div>
               </div>
             )}
