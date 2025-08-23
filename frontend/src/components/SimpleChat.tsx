@@ -14,9 +14,10 @@ interface Source {
 
 interface SimpleChatProps {
     onSourcesUpdate?: (sources: Source[]) => void;
+    excludedSources?: string[];
 }
 
-export function SimpleChat({ }: SimpleChatProps) {
+export function SimpleChat({ excludedSources = [] }: SimpleChatProps) {
     const [messages, setMessages] = useState<Array<{ id: string; role: 'user' | 'assistant'; content: string; sources?: Source[] }>>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -72,7 +73,8 @@ export function SimpleChat({ }: SimpleChatProps) {
             await saveMessageToSupabase(userMessage);
 
             const response = await axios.post('/api/chat', {
-                messages: [...messages, userMessage]
+                messages: [...messages, userMessage],
+                excludedSources
             });
 
             const responseData = await response.data;

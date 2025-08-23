@@ -1,14 +1,15 @@
 import axios from 'axios';
 
 export async function POST(req: Request) {
-    const { messages } = await req.json();
+    const { messages, excludedSources } = await req.json();
     const lastMessage = messages[messages.length - 1];
 
     try {
         // Call our backend API
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
         const response = await axios.post(`${backendUrl}/api/query`, {
-            question: lastMessage.content
+            question: lastMessage.content,
+            excludedSources: excludedSources || []
         });
 
         const answer = response.data.answer?.response || response.data.answer || response.data.response || 'No answer returned.';

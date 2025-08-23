@@ -18,7 +18,7 @@ A beautiful, modern RAG (Retrieval-Augmented Generation) application featuring H
 - **Smart Subtitle Handling**: Optional timestamp removal for VTT/SRT files with timing preservation
 - **Recursive Website Crawling**: Automatically discover and index entire websites with robots.txt support
 - **Real-time Progress Tracking**: Live updates during ingestion with Server-Sent Events (SSE)
-- **Advanced Document Management**: View, refresh, and delete sources with intelligent URL matching
+- **Advanced Document Management**: View and refresh sources with read-only access for data integrity
 - **Qdrant Cloud Integration**: Optional cloud-based vector database for enterprise scalability
 - **Enhanced Text Formatting**: Improved readability with proper line breaks, spacing, and structure
 
@@ -64,7 +64,7 @@ The application features a stunning glassmorphism design with recent improvement
 ### Environment Setup
 
 1. **Clone the repository**:
-   ```bash
+```bash
    git clone <repository-url>
    cd chai-rag-feat-add-nextjs-frontend
    ```
@@ -72,12 +72,12 @@ The application features a stunning glassmorphism design with recent improvement
 2. **Set up environment variables**:
    Create `backend/.env`:
    ```env
-   GOOGLE_API_KEY=your_google_api_key_here
+GOOGLE_API_KEY=your_google_api_key_here
    QDRANT_URL=http://qdrant:6333
-   QDRANT_COLLECTION=documents
-   PORT=3000
-   ```
-   
+QDRANT_COLLECTION=documents
+PORT=3000
+```
+
    Create `frontend/.env.local` for chat persistence:
    ```env
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
@@ -85,16 +85,16 @@ The application features a stunning glassmorphism design with recent improvement
    ```
 
 3. **Start the application**:
-   ```bash
+```bash
    # Build and start all services
    docker compose build
    docker compose up -d
-   ```
+```
 
 4. **Access the application**:
-   - Frontend: http://localhost:3001
-   - Backend API: http://localhost:3000
-   - Qdrant Vector DB: http://localhost:6333
+- Frontend: http://localhost:3001
+- Backend API: http://localhost:3000
+- Qdrant Vector DB: http://localhost:6333
 
 ## 🌐 Production Deployment
 
@@ -220,7 +220,7 @@ For enhanced chat experience with message history and session management:
 - `POST /api/documents` - Upload and process multiple files (up to 10 files)
 - `POST /api/query` - Query the knowledge base in Hitesh's Hinglish style
 - `GET /api/documents` - List all documents with metadata and chunk counts
-- `DELETE /api/documents/:source` - Delete documents with flexible URL matching
+- `GET /api/documents` - List all documents with metadata and chunk counts (read-only)
 - `GET /api/progress/:opId` - SSE endpoint for real-time progress updates
 
 #### Chat Functionality
@@ -263,7 +263,7 @@ The Sources panel provides:
 
 - **Document Overview**: Shows titles, URLs, and chunk counts
 - **Clickable Links**: Direct access to web sources
-- **Delete Functionality**: Remove individual documents from the database with flexible URL matching
+- **Smart Filtering**: Include/exclude sources from AI responses without data loss
 - **Refresh Capability**: Manual refresh of the document list
 - **Loading States**: Visual feedback during operations
 - **Error Handling**: Improved error messages for failed operations
@@ -349,7 +349,7 @@ The Docker setup has been optimized for size and performance:
 - **Multiple File Upload**: Process up to 10 files simultaneously with batch processing
 - **Smart Subtitle Processing**: VTT/SRT support with optional timestamp removal
 - **Enhanced Text Formatting**: Improved readability with proper line breaks and structure
-- **Flexible Document Deletion**: Intelligent URL matching for better source management
+- **Smart Source Filtering**: Choose which sources to include/exclude from AI responses without deleting data
 
 ### 💬 Enhanced Chat Experience
 - **Intuitive Chat Flow**: Input bar at top, newest messages at top for natural conversation

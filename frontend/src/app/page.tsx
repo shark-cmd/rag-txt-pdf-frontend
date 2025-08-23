@@ -36,6 +36,10 @@ const Home: NextPage = () => {
   const [isConnectingToCloud, setIsConnectingToCloud] = useState(false);
   const [cloudConnectionStatus, setCloudConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
 
+  // State for source filtering
+  const [excludedSources, setExcludedSources] = useState<Set<string>>(new Set());
+  const [showSourceFilters, setShowSourceFilters] = useState(false);
+
   useEffect(() => {
     return () => {
       // cleanup SSE on unmount
@@ -96,24 +100,27 @@ const Home: NextPage = () => {
     }
   };
 
-  const deleteDocument = async (source: string) => {
-    try {
-      await axios.delete(`${API_URL}/documents/${encodeURIComponent(source)}`);
-      // Refresh the documents list after deletion
-      await fetchAllDocuments();
-      setError(null);
-    } catch (err: unknown) {
-      console.error('Failed to delete document:', err);
-      let errorMessage = 'Failed to delete document. Please try again.';
 
-      if (axios.isAxiosError(err) && err.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err instanceof Error) {
-        errorMessage = err.message;
+
+  // Source filtering functions
+  const toggleSourceExclusion = (source: string) => {
+    setExcludedSources(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(source)) {
+        newSet.delete(source);
+      } else {
+        newSet.add(source);
       }
+      return newSet;
+    });
+  };
 
-      setError(errorMessage);
-    }
+  const resetSourceFilters = () => {
+    setExcludedSources(new Set());
+  };
+
+  const getActiveSourcesCount = () => {
+    return allDocuments.length - excludedSources.size;
   };
 
   const handleError = (err: unknown, defaultMessage: string) => {
@@ -494,15 +501,46 @@ const Home: NextPage = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                 </svg>
                 <h3 className="font-semibold">Sources</h3>
+                <span className="text-xs text-white/60">
+                  ({getActiveSourcesCount()}/{allDocuments.length} active)
+                </span>
               </div>
-              <button
-                onClick={fetchAllDocuments}
-                disabled={isLoadingDocuments}
-                className="text-xs bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded px-2 py-1 transition-colors disabled:opacity-50"
-              >
-                {isLoadingDocuments ? 'Loading...' : 'Refresh'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowSourceFilters(!showSourceFilters)}
+                  className="text-xs bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded px-2 py-1 transition-colors"
+                  title="Toggle source filters"
+                >
+                  {showSourceFilters ? 'Hide Filters' : 'Show Filters'}
+                </button>
+                <button
+                  onClick={fetchAllDocuments}
+                  disabled={isLoadingDocuments}
+                  className="text-xs bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded px-2 py-1 transition-colors disabled:opacity-50"
+                >
+                  {isLoadingDocuments ? 'Loading...' : 'Refresh'}
+                </button>
+              </div>
             </div>
+            {/* Source Filtering Controls */}
+            {showSourceFilters && allDocuments.length > 0 && (
+              <div className="mb-3 p-3 bg-white/5 rounded border border-white/10">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-white/80">Filter Sources</span>
+                  <button
+                    onClick={resetSourceFilters}
+                    className="text-xs text-blue-300 hover:text-blue-200 transition-colors"
+                    title="Reset all filters"
+                  >
+                    Reset
+                  </button>
+                </div>
+                <div className="text-xs text-white/60 mb-2">
+                  Excluded sources won't be used in AI responses
+                </div>
+              </div>
+            )}
+
             <div className="max-h-32 overflow-y-auto space-y-2">
               {allDocuments.length === 0 ? (
                 <div className="text-white/40 text-sm">
@@ -510,29 +548,43 @@ const Home: NextPage = () => {
                 </div>
               ) : (
                 allDocuments.map((doc, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm p-2 bg-white/5 rounded border border-white/10">
+                  <div key={i} className={`flex items-center justify-between text-sm p-2 rounded border transition-all ${excludedSources.has(doc.source)
+                    ? 'bg-red-500/10 border-red-500/20 opacity-60'
+                    : 'bg-white/5 border-white/10'
+                    }`}>
                     <div className="flex-1 min-w-0">
                       {doc.source.startsWith('http') ? (
                         <a
                           href={doc.source}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-300 hover:text-blue-200 transition-colors truncate block"
+                          className={`transition-colors truncate block ${excludedSources.has(doc.source)
+                            ? 'text-red-300 hover:text-red-200'
+                            : 'text-blue-300 hover:text-blue-200'
+                            }`}
                         >
                           {doc.title} ({doc.chunks} chunks)
                         </a>
                       ) : (
-                        <span className="text-white/80 truncate block">
+                        <span className={`truncate block ${excludedSources.has(doc.source)
+                          ? 'text-red-300'
+                          : 'text-white/80'
+                          }`}>
                           {doc.title} ({doc.chunks} chunks)
                         </span>
                       )}
                     </div>
+
+                    {/* Toggle Source Filter Button */}
                     <button
-                      onClick={() => deleteDocument(doc.source)}
-                      className="ml-2 text-red-400 hover:text-red-300 text-xs transition-colors"
-                      title="Delete document"
+                      onClick={() => toggleSourceExclusion(doc.source)}
+                      className={`ml-2 text-xs transition-colors rounded px-2 py-1 ${excludedSources.has(doc.source)
+                        ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/30'
+                        : 'bg-green-500/20 text-green-300 hover:bg-green-500/30 border border-green-500/30'
+                        }`}
+                      title={excludedSources.has(doc.source) ? 'Include source' : 'Exclude source'}
                     >
-                      ✗
+                      {excludedSources.has(doc.source) ? 'Include' : 'Exclude'}
                     </button>
                   </div>
                 ))
@@ -668,10 +720,13 @@ const Home: NextPage = () => {
         </header>
 
         {/* Chat Component */}
-        <SimpleChat onSourcesUpdate={(sources) => {
-          // Handle sources update if needed
-          console.log('Sources updated:', sources);
-        }} />
+        <SimpleChat
+          onSourcesUpdate={(sources) => {
+            // Handle sources update if needed
+            console.log('Sources updated:', sources);
+          }}
+          excludedSources={Array.from(excludedSources)}
+        />
       </main>
     </div>
   );
