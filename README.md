@@ -75,6 +75,12 @@ The application features a stunning glassmorphism design with recent improvement
    QDRANT_COLLECTION=documents
    PORT=3000
    ```
+   
+   Create `frontend/.env.local` for chat persistence:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+   ```
 
 3. **Start the application**:
    ```bash
@@ -112,6 +118,45 @@ For enhanced scalability and performance, you can optionally use Qdrant Cloud in
    - **Security**: Enterprise-grade security and compliance
    - **Monitoring**: Built-in analytics and monitoring tools
 
+### Supabase Setup for Chat Persistence
+
+For enhanced chat experience with message history and session management:
+
+1. **Create Supabase Project**:
+   - Sign up at [Supabase](https://supabase.com/)
+   - Create a new project
+   - Get your project URL and anon key
+
+2. **Set up Database Tables**:
+   Run the SQL schema from `frontend/supabase-schema.sql` in your Supabase SQL editor:
+   ```sql
+   -- Create chat_messages table for storing chat history
+   CREATE TABLE IF NOT EXISTS chat_messages (
+       id TEXT PRIMARY KEY,
+       role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+       content TEXT NOT NULL,
+       session_id TEXT NOT NULL,
+       timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+   );
+
+   -- Create chat_sessions table for managing chat sessions
+   CREATE TABLE IF NOT EXISTS chat_sessions (
+       id TEXT PRIMARY KEY,
+       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+       last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+   );
+   ```
+
+3. **Configure Environment Variables**:
+   Add your Supabase credentials to `frontend/.env.local`
+
+4. **Benefits of Chat Persistence**:
+   - **Session Management**: Maintain conversation context across browser sessions
+   - **Chat History**: Access to previous conversations and learning progress
+   - **Source Attribution**: Track which documents informed each AI response
+   - **Better UX**: Seamless conversation flow without losing context
+
 ## 🛠️ Technology Stack
 
 ### Backend
@@ -140,6 +185,12 @@ For enhanced scalability and performance, you can optionally use Qdrant Cloud in
 - `GET /api/documents` - List all documents with metadata and chunk counts
 - `DELETE /api/documents/:source` - Delete documents with flexible URL matching
 - `GET /api/progress/:opId` - SSE endpoint for real-time progress updates
+
+#### Chat Functionality
+- `POST /api/chat` - Frontend chat endpoint that proxies to backend query API
+- **Response Format**: Returns both answer and sources for enhanced transparency
+- **Session Management**: Integrates with Supabase for chat persistence
+- **Source Attribution**: Includes document sources with each AI response
 
 #### Qdrant Cloud Integration
 - `POST /api/qdrant-cloud/connect` - Connect to Qdrant Cloud instance
@@ -252,6 +303,9 @@ The Docker setup has been optimized for size and performance:
 - **Enhanced Chat Interface**: Larger message bubbles with better visual hierarchy
 - **Better Input Areas**: Larger text areas and improved focus states
 - **Visual Hierarchy**: Clear section headers, proper spacing, and component organization
+- **Chat Input at Top**: Input bar positioned at top for better UX and accessibility
+- **Newest Messages First**: Latest chat messages appear at top for intuitive conversation flow
+- **Scroll to Bottom Button**: Easy access to older messages with floating navigation button
 
 ### 🚀 Advanced Features
 - **Qdrant Cloud Support**: Optional cloud-based vector database with connection management
@@ -260,12 +314,28 @@ The Docker setup has been optimized for size and performance:
 - **Enhanced Text Formatting**: Improved readability with proper line breaks and structure
 - **Flexible Document Deletion**: Intelligent URL matching for better source management
 
+### 💬 Enhanced Chat Experience
+- **Intuitive Chat Flow**: Input bar at top, newest messages at top for natural conversation
+- **Message Persistence**: Supabase integration for chat history and session management
+- **Source Attribution**: Display of document sources below AI responses for transparency
+- **Session Management**: Clear session button to start fresh conversations
+- **Auto-resizing Input**: Smart textarea that grows with content for better typing experience
+- **Real-time Loading**: Visual feedback during AI processing with animated indicators
+
 ### 🐛 Critical Bug Fixes
 - **Crawler Delay Conflict**: Fixed naming conflict between delay property and method
 - **Frontend Syntax Errors**: Resolved template literal and JSX compilation issues
 - **URL Matching Issues**: Enhanced document deletion with flexible URL handling
 - **Sources Panel Restoration**: Re-added document management interface
 - **Progress Tracking**: Improved real-time updates with better error handling
+
+### 🎯 Latest Chat Interface Improvements
+- **Input Bar Positioning**: Moved chat input to top for better accessibility and UX
+- **Message Ordering**: Newest messages appear at top for intuitive conversation flow
+- **Scroll Navigation**: Added floating scroll-to-bottom button for easy access to older messages
+- **ESLint Compliance**: Fixed all TypeScript/ESLint errors for clean Docker builds
+- **Type Safety**: Replaced `any` types with proper `Source` interface for better code quality
+- **Chat Persistence**: Full Supabase integration for message history and session management
 
 ## 📝 Development
 
@@ -295,6 +365,9 @@ docker compose -f docker-compose.yml up -d
 - **File Upload Errors**: Ensure files are under size limits, check supported formats
 - **Formatting Issues**: Verify system prompt is properly loaded, check post-processing functions
 - **Qdrant Cloud**: Verify credentials, check network connectivity to cloud instance
+- **Chat Persistence**: Ensure Supabase credentials are correct, check database table setup
+- **Message Ordering**: Verify chat component is using latest version with proper message ordering
+- **ESLint Build Errors**: Check for TypeScript type issues, ensure all `any` types are properly defined
 
 #### Performance Optimization
 - **Large Datasets**: Consider using Qdrant Cloud for better performance
