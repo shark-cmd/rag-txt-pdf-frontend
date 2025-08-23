@@ -1,32 +1,45 @@
-# Personal NotebookLM - Hitesh Choudhary Edition
+# Chai RAG - Hitesh Choudhary Edition
 
-A beautiful, modern RAG (Retrieval-Augmented Generation) application featuring Hitesh Choudhary's unique teaching style and personality. This AI-powered knowledge assistant helps you create your own personal knowledge base by ingesting documents, websites, and text, then querying it with natural language in Hitesh's characteristic Hinglish communication style.
+A beautiful, modern RAG (Retrieval-Augmented Generation) application featuring Hitesh Choudhary's authentic teaching style and personality. This AI-powered knowledge assistant helps you create your own personal knowledge base by ingesting documents, websites, and text, then querying it with natural language in Hitesh's characteristic Hinglish communication style - complete with chai analogies and no-spoon-feeding approach!
 
 ## ✨ Features
 
-- **Hitesh Choudhary's Teaching Style**: Authentic Hinglish communication with chai analogies and cultural references
-- **No-Spoon-Feeding Approach**: Guidance-based learning that encourages independent problem-solving
-- **Beautiful Modern UI**: Glassmorphism design with gradient backgrounds and smooth animations
-- **Multi-format Document Ingestion**: Upload PDF, DOCX, TXT, MD, CSV, VTT, and SRT files
-- **Multiple File Upload**: Process multiple files simultaneously for efficient batch processing
-- **Recursive Website Crawling**: Automatically discover and index all sub-pages of a website
+### 🎯 Hitesh Sir's Authentic Experience
+- **Authentic Hinglish Communication**: Natural mixing of Hindi-English with phrases like "Haan ji", "dekho", "samjha?", "chal"
+- **Chai Analogies**: Programming concepts explained through chai references - "Python is like chai - simple, flexible, everyone loves it"
+- **No-Spoon-Feeding Teaching**: Guides you to solutions with "Try karo pehle", "logic samjho", encourages independent thinking
+- **Cultural References**: Everyday Indian examples - cricket teams, mom's recipes, tapri chai orders
+- **Motivational Approach**: "Galti karna normal hai, seekhna important hai" - encouraging but challenging
+
+### 💻 Technical Features
+- **Enhanced Modern UI**: Glassmorphism design with improved typography, spacing, and visual hierarchy
+- **Multi-format Document Support**: PDF, DOCX, TXT, MD, CSV, VTT, and SRT files with intelligent processing
+- **Multiple File Upload**: Process up to 10 files simultaneously with batch processing
+- **Smart Subtitle Handling**: Optional timestamp removal for VTT/SRT files with timing preservation
+- **Recursive Website Crawling**: Automatically discover and index entire websites with robots.txt support
 - **Real-time Progress Tracking**: Live updates during ingestion with Server-Sent Events (SSE)
-- **Document Management**: View, refresh, and delete sources from the database
-- **Natural Language Queries**: Ask questions about your knowledge base in conversational Hinglish
-- **Source Attribution**: See which documents were used to generate answers
-- **Responsive Design**: Works seamlessly on desktop and mobile devices
-- **Qdrant Cloud Integration**: Optional cloud-based vector database for enhanced scalability and performance
+- **Advanced Document Management**: View, refresh, and delete sources with intelligent URL matching
+- **Qdrant Cloud Integration**: Optional cloud-based vector database for enterprise scalability
+- **Enhanced Text Formatting**: Improved readability with proper line breaks, spacing, and structure
 
-## 🎨 UI Design
+## 🎨 Enhanced UI Design
 
-The application features a stunning glassmorphism design inspired by modern AI interfaces:
+The application features a stunning glassmorphism design with recent improvements:
 
-- **Gradient Backgrounds**: Beautiful purple-to-slate gradients with subtle patterns
-- **Glassmorphism Effects**: Translucent panels with backdrop blur and subtle borders
-- **Smooth Animations**: Hover effects, loading states, and micro-interactions
-- **Modern Icons**: Lucide React icons throughout the interface
-- **Progress Visualization**: Real-time progress bars and status indicators
-- **Color-coded Actions**: Different gradient buttons for different actions (blue for text, green for crawling, etc.)
+### Visual Enhancements
+- **Enhanced Layout**: Wider sidebar (384px) with better component spacing and breathing room
+- **Improved Typography**: Better font sizes, line heights (1.8), and letter spacing for readability
+- **Enhanced Glassmorphism**: Translucent panels with backdrop blur and optimized transparency
+- **Better Color Scheme**: Purple-to-indigo gradients with improved contrast ratios
+- **Modern Icons**: Lucide React icons with consistent sizing and styling
+- **Responsive Chat Interface**: Larger message bubbles with better spacing and visual hierarchy
+
+### User Experience Improvements
+- **Enhanced Input Areas**: Larger text areas and input fields with better focus states
+- **Improved Progress Visualization**: Real-time progress bars with better visual feedback
+- **Better Loading States**: Smooth animations and micro-interactions for all loading states
+- **Clear Visual Hierarchy**: Better section headers, spacing, and component organization
+- **Mobile-First Design**: Responsive layout that works seamlessly across all devices
 
 ## 🏗️ High-level Architecture
 
@@ -119,13 +132,19 @@ For enhanced scalability and performance, you can optionally use Qdrant Cloud in
 
 ### API Endpoints
 
-- `POST /api/text` - Add raw text content
-- `POST /api/crawl` - Recursively crawl a website
-- `POST /api/documents` - Upload and process files
-- `POST /api/query` - Query the knowledge base
-- `GET /api/documents` - List all documents in the database
-- `DELETE /api/documents/:source` - Delete a specific document
-- `GET /api/progress/:opId` - SSE endpoint for progress updates
+#### Core Functionality
+- `POST /api/text` - Add raw text content to the knowledge base
+- `POST /api/crawl` - Recursively crawl websites with robots.txt support
+- `POST /api/documents` - Upload and process multiple files (up to 10 files)
+- `POST /api/query` - Query the knowledge base in Hitesh's Hinglish style
+- `GET /api/documents` - List all documents with metadata and chunk counts
+- `DELETE /api/documents/:source` - Delete documents with flexible URL matching
+- `GET /api/progress/:opId` - SSE endpoint for real-time progress updates
+
+#### Qdrant Cloud Integration
+- `POST /api/qdrant-cloud/connect` - Connect to Qdrant Cloud instance
+- `POST /api/qdrant-cloud/disconnect` - Switch back to local Qdrant
+- `GET /api/qdrant-cloud/status` - Check cloud connection status
 
 ## 🌟 Website Crawling Features
 
@@ -218,27 +237,35 @@ The Docker setup has been optimized for size and performance:
 - **Caching**: Intelligent caching of frequently accessed data
 - **Background Processing**: Non-blocking ingestion operations
 
-## 🔧 Recent Fixes & Improvements
+## 🔧 Latest Updates & Improvements
 
-### Crawler Issues Resolved
-- **Fixed delay function conflict**: Resolved naming conflict between delay property and method
-- **Improved error handling**: Better error messages and graceful failure handling
-- **Enhanced URL matching**: Flexible matching for document deletion with URL variations
+### ✨ Hitesh Choudhary Persona Integration
+- **Authentic Personality**: Real Hitesh teaching style with natural Hinglish communication
+- **Chai Analogies**: Programming concepts explained through chai references and cultural examples
+- **No-Spoon-Feeding Philosophy**: Guides users with "Try karo pehle", "logic samjho" approach
+- **Motivational Teaching**: Encouraging but challenging approach with Indian cultural context
+- **Short & Concise Responses**: Maximum 150 words with proper formatting and line breaks
 
-### Frontend Enhancements
-- **Restored Sources Panel**: Added back the sources management panel in the sidebar
-- **Better Error Display**: Improved error message formatting and user feedback
-- **Enhanced Progress Tracking**: Real-time updates with detailed status information
+### 🎨 Enhanced User Interface
+- **Wider Sidebar**: Increased from 320px to 384px for better component spacing
+- **Improved Typography**: Better font sizes, line heights (1.8), and letter spacing
+- **Enhanced Chat Interface**: Larger message bubbles with better visual hierarchy
+- **Better Input Areas**: Larger text areas and improved focus states
+- **Visual Hierarchy**: Clear section headers, proper spacing, and component organization
 
-### Backend Improvements
-- **Flexible Document Deletion**: Handles URL encoding variations and trailing slashes
-- **Better Debugging**: Logs available sources when deletion fails
-- **Robust URL Matching**: Multiple matching strategies for document identification
-- **Multiple File Processing**: Support for batch uploading and processing up to 10 files
-- **Extended Format Support**: Added CSV, VTT, and SRT file format processing
-- **Timestamp Control**: Optional timestamp removal for subtitle files to preserve timing information
-- **Hitesh Choudhary Persona**: Integrated authentic Hinglish teaching style with chai analogies and cultural references
-- **Qdrant Cloud Integration**: Optional cloud-based vector database with seamless switching between local and cloud instances
+### 🚀 Advanced Features
+- **Qdrant Cloud Support**: Optional cloud-based vector database with connection management
+- **Multiple File Upload**: Process up to 10 files simultaneously with batch processing
+- **Smart Subtitle Processing**: VTT/SRT support with optional timestamp removal
+- **Enhanced Text Formatting**: Improved readability with proper line breaks and structure
+- **Flexible Document Deletion**: Intelligent URL matching for better source management
+
+### 🐛 Critical Bug Fixes
+- **Crawler Delay Conflict**: Fixed naming conflict between delay property and method
+- **Frontend Syntax Errors**: Resolved template literal and JSX compilation issues
+- **URL Matching Issues**: Enhanced document deletion with flexible URL handling
+- **Sources Panel Restoration**: Re-added document management interface
+- **Progress Tracking**: Improved real-time updates with better error handling
 
 ## 📝 Development
 
@@ -262,10 +289,17 @@ docker compose -f docker-compose.yml up -d
 
 ### Troubleshooting
 
-- **Crawler Issues**: Check the backend logs for detailed error messages
-- **Document Deletion**: Verify URL encoding and try refreshing the sources list
-- **API Errors**: Check the health endpoint at `/api/health`
-- **Vector Database**: Ensure Qdrant is running and accessible
+#### Common Issues
+- **Crawler Issues**: Check the backend logs for detailed error messages, verify robots.txt compliance
+- **Document Deletion**: Try refreshing sources list, check URL encoding variations
+- **File Upload Errors**: Ensure files are under size limits, check supported formats
+- **Formatting Issues**: Verify system prompt is properly loaded, check post-processing functions
+- **Qdrant Cloud**: Verify credentials, check network connectivity to cloud instance
+
+#### Performance Optimization
+- **Large Datasets**: Consider using Qdrant Cloud for better performance
+- **Slow Responses**: Check chunk size configuration and vector database performance
+- **Memory Usage**: Monitor container resources during large file processing
 
 ## 🤝 Contributing
 

@@ -38,8 +38,8 @@ class RAGService {
     this.chatModel = new ChatGoogleGenerativeAI(getModelConfig());
 
     this.textSplitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 1500,
-      chunkOverlap: 300,
+      chunkSize: 500,
+      chunkOverlap: 200,
       separators: [
         '\n\n\n',  // Triple line breaks for major sections
         '\n\n',    // Double line breaks for paragraphs
@@ -102,6 +102,80 @@ class RAGService {
     }
 
     return processedLines.join('\n');
+  }
+
+  // Helper function to improve text formatting for better readability
+  improveTextFormatting(text) {
+    if (!text) return text;
+
+    let formattedText = text;
+
+    // Add line breaks after numbered sections (1. 2. 3. etc.)
+    formattedText = formattedText.replace(/(\*\*?\d+\.\s+[^*\n]+?\*\*?)/g, '\n\n$1\n');
+
+    // Add line breaks after bullet points
+    formattedText = formattedText.replace(/(•\s+[^\n]+)/g, '$1\n');
+
+    // Add line breaks after bold headers
+    formattedText = formattedText.replace(/(\*\*[^*]+\*\*)/g, '\n\n$1\n');
+
+    // Add line breaks between sentences that are too close together
+    formattedText = formattedText.replace(/([.!?])\s+([A-Z])/g, '$1\n\n$2');
+
+    // Clean up excessive line breaks
+    formattedText = formattedText.replace(/\n{4,}/g, '\n\n\n');
+
+    // Ensure proper spacing around timestamps
+    formattedText = formattedText.replace(/(\(\d{2}:\d{2}:\d{2}[.,]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[.,]\d{3}\))/g, '\n$1\n');
+
+    // Add spacing after code snippets
+    formattedText = formattedText.replace(/(`[^`]+`)/g, '$1 ');
+
+    // Ensure proper paragraph breaks
+    formattedText = formattedText.replace(/([.!?])\s+(\*\*)/g, '$1\n\n$2');
+
+    // Add line breaks after timestamps in the format "00:00:17.960 - 00:00:24.000:"
+    formattedText = formattedText.replace(/(\d{2}:\d{2}:\d{2}\.\d{3}\s*-\s*\d{2}:\d{2}:\d{2}\.\d{3}:)/g, '\n$1\n');
+
+    // Add line breaks after "Like *chai*" and similar phrases
+    formattedText = formattedText.replace(/(Like\s+\*[^*]+\*[^.!?]*[.!?])/g, '$1\n');
+
+    // Add line breaks after "So *flexible*" and similar phrases
+    formattedText = formattedText.replace(/(So\s+\*[^*]+\*[^.!?]*[.!?])/g, '$1\n');
+
+    // Add line breaks after "Now go *code*" and similar phrases
+    formattedText = formattedText.replace(/(Now\s+go\s+\*[^*]+\*[^.!?]*[.!?])/g, '$1\n');
+
+    // Add line breaks after "Arre yaar!" and similar exclamations
+    formattedText = formattedText.replace(/(Arre\s+[^.!?]*[.!?])/g, '$1\n');
+
+    // Add line breaks after "Let's see why" and similar phrases
+    formattedText = formattedText.replace(/(Let's\s+see\s+why[^.!?]*[.!?])/g, '$1\n');
+
+    // Add line breaks after "chal!" and similar phrases
+    formattedText = formattedText.replace(/(chal![^.!?]*[.!?])/g, '$1\n');
+
+    // Add line breaks after "dekho" and similar phrases
+    formattedText = formattedText.replace(/(dekho[^.!?]*[.!?])/g, '$1\n');
+
+    // Add line breaks after "yaar!" and similar phrases
+    formattedText = formattedText.replace(/(yaar![^.!?]*[.!?])/g, '$1\n');
+
+    // Clean up multiple consecutive line breaks
+    formattedText = formattedText.replace(/\n{3,}/g, '\n\n');
+
+    // Manual formatting for common patterns
+    formattedText = formattedText.replace(/(\*\*Step \d+[^*]*\*\*)/g, '\n\n$1\n');
+    formattedText = formattedText.replace(/(\*\*[^*]+?\*\*)/g, '\n\n$1\n');
+    formattedText = formattedText.replace(/(```[\s\S]*?```)/g, '\n\n$1\n\n');
+
+    // Add line breaks after periods followed by spaces
+    formattedText = formattedText.replace(/\.\s+/g, '.\n\n');
+
+    // Clean up excessive line breaks again
+    formattedText = formattedText.replace(/\n{4,}/g, '\n\n');
+
+    return formattedText.trim();
   }
 
   async processWebUrl(url, opId) {
@@ -292,9 +366,12 @@ class RAGService {
         input: query,
       });
 
+      // Improve the formatting of the response
+      const formattedResponse = this.improveTextFormatting(result.answer);
+
       return {
         success: true,
-        response: result.answer,
+        response: formattedResponse,
         sources: result.context,
       };
     } catch (error) {
