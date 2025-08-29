@@ -140,6 +140,25 @@ class RAGService {
     }
   }
 
+  async ensureCollectionExists(collectionName) {
+    try {
+      await this.vectorStore.client.getCollection(collectionName);
+      return true;
+    } catch {
+      const vectorSize = parseInt(process.env.QDRANT_VECTOR_SIZE || '768', 10);
+      try {
+        await this.vectorStore.client.createCollection(collectionName, {
+          vectors: { size: vectorSize, distance: 'Cosine' },
+        });
+        logger.info(`Created Qdrant collection '${collectionName}' with size=${vectorSize}`);
+        return true;
+      } catch (err) {
+        logger.error(`Failed to ensure collection '${collectionName}': ${err.message}`);
+        return false;
+      }
+    }
+  }
+
   // Quick health check for Qdrant to avoid hanging writes
   async isQdrantAvailable(timeoutMs = 5000) {
     try {
@@ -282,6 +301,8 @@ class RAGService {
       emitProgress?.(opId, 'Chunking all pages...');
       const chunks = await this.textSplitter.splitDocuments(allDocs);
 
+      // Ensure collection exists
+      await this.ensureCollectionExists(this.collectionName);
       emitProgress?.(opId, `Storing ${chunks.length} chunks from ${allDocs.length} pages`);
       await this.vectorStore.addDocuments(chunks);
 
@@ -384,6 +405,7 @@ class RAGService {
           if (!qdrantOk) {
             throw new Error('Vector database (Qdrant) is unreachable. Please check QDRANT_URL and connectivity.');
           }
+          await this.ensureCollectionExists(this.collectionName);
           emitProgress?.(opId, `Storing ${chunks.length} chunks from ${originalname}`);
           await this.vectorStore.addDocuments(chunks);
         } finally {
@@ -422,6 +444,7 @@ class RAGService {
       if (!qdrantOk) {
         throw new Error('Vector database (Qdrant) is unreachable. Please check QDRANT_URL and connectivity.');
       }
+      await this.ensureCollectionExists(this.collectionName);
       emitProgress?.(opId, `Storing ${chunks.length} chunks`);
       await this.vectorStore.addDocuments(chunks);
       logger.info(`Successfully processed and stored raw text input.`);
@@ -670,7 +693,12 @@ class RAGService {
       };
     } catch (error) {
       logger.error(`Error listing collections: ${error.message}`);
-      throw error;
+      return {
+        success: false,
+        active: this.collectionName,
+        collections: [],
+        error: error.message
+      };
     }
   }
 }
