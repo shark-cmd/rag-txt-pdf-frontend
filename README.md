@@ -14,11 +14,12 @@ A beautiful, modern RAG (Retrieval-Augmented Generation) application featuring H
 ### 💻 Technical Features
 - **Enhanced Modern UI**: Glassmorphism design with improved typography, spacing, and visual hierarchy
 - **Multi-format Document Support**: PDF, DOCX, TXT, MD, CSV, VTT, and SRT files with intelligent processing
-- **Multiple File Upload**: Process up to 10 files simultaneously with batch processing
+- **Bulk File Uploads (500+)**: Disk-backed queue with controlled concurrency and non-blocking SSE progress
 - **Smart Subtitle Handling**: Optional timestamp removal for VTT/SRT files with timing preservation
 - **Recursive Website Crawling**: Automatically discover and index entire websites with robots.txt support
 - **Real-time Progress Tracking**: Live updates during ingestion with Server-Sent Events (SSE)
-- **Advanced Document Management**: View and refresh sources with read-only access for data integrity
+- **Collection-Aware Storage**: Create/switch Qdrant collections per upload or via API
+- **Top K Retrieval Control**: UI selector to choose how many chunks to retrieve per query
 - **Qdrant Cloud Integration**: Optional cloud-based vector database for enterprise scalability
 - **Enhanced Text Formatting**: Improved readability with proper line breaks, spacing, and structure
 
@@ -119,16 +120,16 @@ For production deployment, we recommend using **Vercel for the frontend** and **
 
 📖 **Complete deployment guide**: See [DEPLOYMENT.md](./DEPLOYMENT.md) for step-by-step instructions.
 
-### Quick Deploy Commands
+### Quick Deploy Scripts
 
 ```bash
-# Deploy backend to Railway
-cd backend
-railway up
+# Frontend → Vercel (non-interactive)
+chmod +x scripts/deploy-frontend-vercel.sh
+ENVIRONMENT=production VERCEL_TOKEN=... ./scripts/deploy-frontend-vercel.sh
 
-# Deploy frontend to Vercel
-cd frontend
-vercel --prod
+# Backend → Railway (non-interactive)
+chmod +x scripts/deploy-backend-railway.sh
+RAILWAY_TOKEN=... ./scripts/deploy-backend-railway.sh
 ```
 
 ### Qdrant Cloud Configuration (Optional)
@@ -217,8 +218,10 @@ For enhanced chat experience with message history and session management:
 #### Core Functionality
 - `POST /api/text` - Add raw text content to the knowledge base
 - `POST /api/crawl` - Recursively crawl websites with robots.txt support
-- `POST /api/documents` - Upload and process multiple files (up to 10 files)
+- `POST /api/documents` - Upload and enqueue files (supports 500+ files)
+- `POST /api/documents?collectionName=my_collection` - Upload into a specific/new collection
 - `POST /api/query` - Query the knowledge base in Hitesh's Hinglish style
+- `POST /api/collections/use` - Switch active collection (creates if missing)
 - `GET /api/documents` - List all documents with metadata and chunk counts
 - `GET /api/documents` - List all documents with metadata and chunk counts (read-only)
 - `GET /api/progress/:opId` - SSE endpoint for real-time progress updates
@@ -399,7 +402,7 @@ docker compose -f docker-compose.yml up -d
 #### Common Issues
 - **Crawler Issues**: Check the backend logs for detailed error messages, verify robots.txt compliance
 - **Document Deletion**: Try refreshing sources list, check URL encoding variations
-- **File Upload Errors**: Ensure files are under size limits, check supported formats
+- **File Upload Errors**: Ensure files are under size limits, check supported formats; for 500+ files, verify `UPLOAD_MAX_FILES`, `INGEST_CONCURRENCY`, and `UPLOAD_DIR`
 - **Formatting Issues**: Verify system prompt is properly loaded, check post-processing functions
 - **Qdrant Cloud**: Verify credentials, check network connectivity to cloud instance
 - **Chat Persistence**: Ensure Supabase credentials are correct, check database table setup
