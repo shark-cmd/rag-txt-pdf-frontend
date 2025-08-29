@@ -166,13 +166,20 @@ class RAGService {
       if (now - this.lastQdrantHealthCheckAt < 10000) {
         return this.lastQdrantHealthy;
       }
-      if (!this.qdrantUrl) {
+      // Prefer cloud URL if connected
+      const urlToCheck = this.isUsingCloud && this.cloudConfig?.url ? this.cloudConfig.url : this.qdrantUrl;
+      const apiKey = this.isUsingCloud && this.cloudConfig?.apiKey ? this.cloudConfig.apiKey : undefined;
+      if (!urlToCheck) {
         this.lastQdrantHealthy = false;
         this.lastQdrantHealthCheckAt = now;
         return false;
       }
       const signal = AbortSignal.timeout(timeoutMs);
-      const res = await fetch(`${this.qdrantUrl.replace(/\/$/, '')}/collections`, { method: 'GET', signal });
+      const res = await fetch(`${urlToCheck.replace(/\/$/, '')}/collections`, {
+        method: 'GET',
+        signal,
+        headers: apiKey ? { 'api-key': apiKey } : undefined,
+      });
       this.lastQdrantHealthy = res.ok;
       this.lastQdrantHealthCheckAt = now;
       return res.ok;
@@ -625,6 +632,7 @@ class RAGService {
       this.collectionName = collectionName;
       this.isUsingCloud = true;
       this.cloudConfig = { url, apiKey, collectionName };
+      this.qdrantUrl = url;
 
       logger.info(`Successfully connected to Qdrant Cloud at ${url}`);
 
@@ -653,6 +661,7 @@ class RAGService {
       this.isUsingCloud = false;
       this.cloudConfig = null;
       this.collectionName = process.env.QDRANT_COLLECTION || 'documents';
+      this.qdrantUrl = process.env.QDRANT_URL;
 
       logger.info('Successfully disconnected from Qdrant Cloud');
 
