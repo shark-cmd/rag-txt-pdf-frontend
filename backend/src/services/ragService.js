@@ -658,6 +658,21 @@ class RAGService {
       throw error;
     }
   }
+
+  async listCollections() {
+    try {
+      const collections = await this.vectorStore.client.getCollections();
+      const names = (collections?.collections || []).map(c => c.name);
+      return {
+        success: true,
+        active: this.collectionName,
+        collections: names
+      };
+    } catch (error) {
+      logger.error(`Error listing collections: ${error.message}`);
+      throw error;
+    }
+  }
 }
 
 export default new RAGService();

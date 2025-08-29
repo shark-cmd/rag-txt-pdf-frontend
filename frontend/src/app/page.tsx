@@ -41,6 +41,9 @@ const Home: NextPage = () => {
   const [showSourceFilters, setShowSourceFilters] = useState(false);
   const [topK, setTopK] = useState<number>(4);
   const [backendMode, setBackendMode] = useState<'local' | 'remote'>(REMOTE_BACKEND ? 'remote' : 'local');
+  const [collections, setCollections] = useState<string[]>([]);
+  const [activeCollection, setActiveCollection] = useState<string>('documents');
+  const [isLoadingCollections, setIsLoadingCollections] = useState(false);
 
   const API_URL = backendMode === 'local'
     ? 'http://localhost:3100/api'
@@ -60,7 +63,36 @@ const Home: NextPage = () => {
   useEffect(() => {
     fetchAllDocuments();
     checkCloudConnectionStatus();
+    fetchCollections();
   }, []);
+
+  const fetchCollections = async () => {
+    setIsLoadingCollections(true);
+    try {
+      const res = await axios.get(`${API_URL}/collections`);
+      if (res.data?.success) {
+        setCollections(res.data.collections || []);
+        if (res.data.active) setActiveCollection(res.data.active);
+      }
+    } catch (e) {
+      console.error('Failed to fetch collections', e);
+    } finally {
+      setIsLoadingCollections(false);
+    }
+  };
+
+  const switchCollection = async (name: string) => {
+    if (!name || name === activeCollection) return;
+    try {
+      await axios.post(`${API_URL}/collections/use`, { collectionName: name });
+      setActiveCollection(name);
+      // Refresh docs list under new collection
+      await fetchAllDocuments();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to switch collection';
+      setError(message);
+    }
+  };
 
   const checkCloudConnectionStatus = async () => {
     try {
@@ -256,7 +288,7 @@ const Home: NextPage = () => {
       const formData = new FormData();
       files.forEach(file => formData.append('document', file));
       await axios.post(`${API_URL}/documents`, formData, {
-        params: { opId, removeTimestamps },
+        params: { opId, removeTimestamps, collectionName: activeCollection },
         headers: { 'Content-Type': 'multipart/form-data' },
       });
     } catch (err) {
@@ -543,6 +575,68 @@ const Home: NextPage = () => {
               </button>
             </div>
             <div className="text-xs text-white/60 mt-2 truncate">Active: {API_URL}</div>
+          </div>
+
+          {/* Collections */}
+          <div className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 text-white">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18" />
+                </svg>
+                <h3 className="font-semibold">Collections</h3>
+              </div>
+              <button
+                onClick={fetchCollections}
+                disabled={isLoadingCollections}
+                className="text-xs bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded px-2 py-1 transition-colors disabled:opacity-50"
+              >
+                {isLoadingCollections ? 'Loading...' : 'Refresh'}
+              </button>
+            </div>
+
+            {/* Active + Switch */}
+            <div className="mb-3">
+              <label className="text-xs text-white/80 block mb-1">Active Collection</label>
+              <select
+                value={activeCollection}
+                onChange={(e) => switchCollection(e.target.value)}
+                className="w-full bg-white/5 border border-white/20 text-white focus:border-indigo-400 focus:ring-indigo-400/20 rounded-md p-2 text-sm"
+              >
+                {[activeCollection, ...collections.filter(c => c !== activeCollection)].map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Create New */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="New collection name"
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter') {
+                    const name = (e.target as HTMLInputElement).value.trim();
+                    if (!name) return;
+                    await switchCollection(name);
+                    await fetchCollections();
+                    (e.target as HTMLInputElement).value = '';
+                  }
+                }}
+                className="flex-1 bg-white/5 border border-white/20 text-white placeholder:text-white/40 focus:border-indigo-400 focus:ring-indigo-400/20 rounded-md p-2 text-sm"
+              />
+              <button
+                onClick={async () => {
+                  const input = (document.activeElement as HTMLInputElement);
+                  const name = input?.value?.trim();
+                  if (!name) return;
+                  await switchCollection(name);
+                  await fetchCollections();
+                  if (input) input.value = '';
+                }}
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0 rounded-md px-3 text-sm"
+              >Create/Use</button>
+            </div>
           </div>
 
           {/* Sources Section */}

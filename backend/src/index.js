@@ -230,6 +230,16 @@ async function initializeApp() {
       }
     });
 
+    // List collections
+    app.get('/api/collections', async (req, res, next) => {
+      try {
+        const result = await ragService.listCollections();
+        res.json(result);
+      } catch (error) {
+        next(error);
+      }
+    });
+
     // Error handling middleware
     app.use((err, req, res, next) => {
       logger.error(err.stack);
