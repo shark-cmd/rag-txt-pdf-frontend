@@ -20,12 +20,17 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // Initialize RAG service
 let ragService;
+let bulkPdfService;
 
 async function initializeApp() {
   try {
     // Import RAG service dynamically
     const ragModule = await import('./services/ragService.js');
     ragService = ragModule.default;
+
+    // Import Bulk PDF service
+    const bulkPdfModule = await import('./services/bulkPdfService.js');
+    bulkPdfService = new bulkPdfModule.default(ragService);
 
     // Progress SSE
     const progressModule = await import('./services/progress.js');
@@ -164,6 +169,83 @@ async function initializeApp() {
       }
     });
 
+    // --- Bulk PDF Processing Endpoints ---
+
+    // Start bulk PDF processing
+    app.post('/api/bulk-pdf/process', async (req, res, next) => {
+      try {
+        const { pdfDirectory } = req.body;
+        const { opId } = req.query;
+        
+        if (!pdfDirectory) {
+          return res.status(400).json({ error: 'PDF directory path is required' });
+        }
+
+        if (!opId) {
+          return res.status(400).json({ error: 'Operation ID is required for progress tracking' });
+        }
+
+        // Start processing in background
+        bulkPdfService.processDirectory(pdfDirectory, opId)
+          .catch(error => {
+            logger.error(`Bulk PDF processing failed: ${error.message}`);
+          });
+
+        res.status(202).json({ 
+          message: 'Bulk PDF processing started',
+          operationId: opId,
+          status: 'processing'
+        });
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    // Resume bulk PDF processing
+    app.post('/api/bulk-pdf/resume', async (req, res, next) => {
+      try {
+        const { opId } = req.query;
+        
+        if (!opId) {
+          return res.status(400).json({ error: 'Operation ID is required for progress tracking' });
+        }
+
+        // Start resume processing in background
+        bulkPdfService.resumeProcessing(opId)
+          .catch(error => {
+            logger.error(`Bulk PDF resume failed: ${error.message}`);
+          });
+
+        res.status(202).json({ 
+          message: 'Bulk PDF processing resumed',
+          operationId: opId,
+          status: 'resuming'
+        });
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    // Get bulk PDF processing stats
+    app.get('/api/bulk-pdf/stats', async (req, res, next) => {
+      try {
+        const stats = await bulkPdfService.getStats();
+        res.json(stats);
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    // Clear bulk PDF manifest
+    app.delete('/api/bulk-pdf/manifest', async (req, res, next) => {
+      try {
+        const result = await bulkPdfService.clearManifest();
+        res.json(result);
+      } catch (error) {
+        next(error);
+      }
+    });
+
     // Error handling middleware
     app.use((err, req, res, next) => {
       logger.error(err.stack);
@@ -191,4 +273,21 @@ initializeApp().catch(error => {
   logger.error('Fatal error during initialization:', error);
   console.error('Fatal error during initialization:', error);
   process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  if (bulkPdfService) {
+    bulkPdfService.close();
+  }
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  if (bulkPdfService) {
+    bulkPdfService.close();
+  }
+  process.exit(0);
 });
