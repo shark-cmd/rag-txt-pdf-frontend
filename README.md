@@ -14,11 +14,12 @@ A beautiful, modern RAG (Retrieval-Augmented Generation) application featuring H
 ### 💻 Technical Features
 - **Enhanced Modern UI**: Glassmorphism design with improved typography, spacing, and visual hierarchy
 - **Multi-format Document Support**: PDF, DOCX, TXT, MD, CSV, VTT, and SRT files with intelligent processing
-- **Multiple File Upload**: Process up to 10 files simultaneously with batch processing
+- **Bulk File Uploads (500+)**: Disk-backed queue with controlled concurrency and non-blocking SSE progress
 - **Smart Subtitle Handling**: Optional timestamp removal for VTT/SRT files with timing preservation
 - **Recursive Website Crawling**: Automatically discover and index entire websites with robots.txt support
 - **Real-time Progress Tracking**: Live updates during ingestion with Server-Sent Events (SSE)
-- **Advanced Document Management**: View and refresh sources with read-only access for data integrity
+- **Collection-Aware Storage**: Create/switch Qdrant collections per upload or via API
+- **Top K Retrieval Control**: UI selector to choose how many chunks to retrieve per query
 - **Qdrant Cloud Integration**: Optional cloud-based vector database for enterprise scalability
 - **Enhanced Text Formatting**: Improved readability with proper line breaks, spacing, and structure
 
@@ -119,17 +120,97 @@ For production deployment, we recommend using **Vercel for the frontend** and **
 
 📖 **Complete deployment guide**: See [DEPLOYMENT.md](./DEPLOYMENT.md) for step-by-step instructions.
 
-### Quick Deploy Commands
+### Quick Deploy Scripts
 
 ```bash
-# Deploy backend to Railway
-cd backend
-railway up
+# Frontend → Vercel (non-interactive)
+chmod +x scripts/deploy-frontend-vercel.sh
+ENVIRONMENT=production VERCEL_TOKEN=... ./scripts/deploy-frontend-vercel.sh
 
-# Deploy frontend to Vercel
-cd frontend
-vercel --prod
+# Backend → Railway (non-interactive)
+chmod +x scripts/deploy-backend-railway.sh
+RAILWAY_TOKEN=... ./scripts/deploy-backend-railway.sh
 ```
+
+### Detailed Deploy Script Usage
+
+#### Frontend on Vercel
+
+Prerequisites:
+- Node.js and npm available locally (for running the script and npx)
+- Vercel account and a Personal Access Token (Account Settings → Tokens)
+- Optional but recommended: Organization ID and Project ID if the project already exists on Vercel
+
+Required environment variables:
+- `VERCEL_TOKEN`: Your Vercel token (required)
+- `VERCEL_ORG_ID`: Your Vercel organization ID (optional, improves linking)
+- `VERCEL_PROJECT_ID`: Your Vercel project ID (optional, improves linking)
+- Optional overrides: `FRONTEND_DIR` (defaults to `frontend`), `ENVIRONMENT` (defaults to `production`)
+
+Frontend environment variables to configure on Vercel (recommended):
+- `NEXT_PUBLIC_BACKEND_URL`: Your backend base URL (Railway URL or other)
+- `NEXT_PUBLIC_SUPABASE_URL` (optional)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` (optional)
+
+How to run:
+```bash
+export VERCEL_TOKEN=YOUR_VERCEL_TOKEN
+# Optionally, set org/project IDs for a no-prompt link
+export VERCEL_ORG_ID=your_org_id
+export VERCEL_PROJECT_ID=your_project_id
+
+chmod +x scripts/deploy-frontend-vercel.sh
+FRONTEND_DIR=frontend ENVIRONMENT=production ./scripts/deploy-frontend-vercel.sh
+```
+
+What the script does:
+- Runs `vercel pull` non-interactively to populate `.vercel/project.json`
+- Installs dependencies and runs `vercel build`
+- Deploys the prebuilt output with `vercel deploy --prebuilt --prod`
+- Prints the final deployment URL
+
+Tips:
+- To locate org/project IDs, you can run `npx vercel projects ls` and inspect the output, or link once manually with `npx vercel link`.
+- Set project env vars on Vercel once (`npx vercel env set ...`) so all subsequent deploys work without prompts.
+
+#### Backend on Railway
+
+Prerequisites:
+- Railway account and a Railway Token (Account Settings → Tokens)
+- Node.js and npm available locally (for running the script and npx)
+
+Required environment variables:
+- `RAILWAY_TOKEN`: Your Railway token (required)
+- Optional overrides: `BACKEND_DIR` (defaults to `backend`), `RAILWAY_SERVICE` (defaults to `backend`)
+
+Backend environment variables to configure on Railway (recommended):
+- `PORT=3000`
+- `GOOGLE_API_KEY=...`
+- If using local Qdrant (not recommended in hosted envs): `QDRANT_URL=http://qdrant:6333`
+- If using Qdrant Cloud: `QDRANT_URL=https://YOUR-CLUSTER.qdrant.io`, `QDRANT_API_KEY=...` (and set your intended `QDRANT_COLLECTION`)
+- Optional: `QDRANT_COLLECTION=documents` (or any name)
+
+How to run:
+```bash
+export RAILWAY_TOKEN=YOUR_RAILWAY_TOKEN
+
+chmod +x scripts/deploy-backend-railway.sh
+BACKEND_DIR=backend RAILWAY_SERVICE=backend ./scripts/deploy-backend-railway.sh
+```
+
+What the script does:
+- Installs dependencies
+- Runs `railway up` to create/link the project/service non-interactively
+- Triggers `railway deploy` for the specified service
+
+After deploy:
+- Set or verify service variables in the Railway dashboard (Environment → Variables)
+- Find your backend URL in the Railway dashboard (Domains) and set it as `NEXT_PUBLIC_BACKEND_URL` in Vercel for the frontend
+
+Troubleshooting:
+- Invalid tokens: regenerate `VERCEL_TOKEN`/`RAILWAY_TOKEN` and export them before running scripts
+- Missing env vars: ensure the platform has the variables listed above; deploys may succeed but runtime will fail without them
+- Qdrant Cloud connection: use full https URL and a valid API key; verify that REST access is allowed for your cluster
 
 ### Qdrant Cloud Configuration (Optional)
 
@@ -217,8 +298,10 @@ For enhanced chat experience with message history and session management:
 #### Core Functionality
 - `POST /api/text` - Add raw text content to the knowledge base
 - `POST /api/crawl` - Recursively crawl websites with robots.txt support
-- `POST /api/documents` - Upload and process multiple files (up to 10 files)
+- `POST /api/documents` - Upload and enqueue files (supports 500+ files)
+- `POST /api/documents?collectionName=my_collection` - Upload into a specific/new collection
 - `POST /api/query` - Query the knowledge base in Hitesh's Hinglish style
+- `POST /api/collections/use` - Switch active collection (creates if missing)
 - `GET /api/documents` - List all documents with metadata and chunk counts
 - `GET /api/documents` - List all documents with metadata and chunk counts (read-only)
 - `GET /api/progress/:opId` - SSE endpoint for real-time progress updates
@@ -399,7 +482,7 @@ docker compose -f docker-compose.yml up -d
 #### Common Issues
 - **Crawler Issues**: Check the backend logs for detailed error messages, verify robots.txt compliance
 - **Document Deletion**: Try refreshing sources list, check URL encoding variations
-- **File Upload Errors**: Ensure files are under size limits, check supported formats
+- **File Upload Errors**: Ensure files are under size limits, check supported formats; for 500+ files, verify `UPLOAD_MAX_FILES`, `INGEST_CONCURRENCY`, and `UPLOAD_DIR`
 - **Formatting Issues**: Verify system prompt is properly loaded, check post-processing functions
 - **Qdrant Cloud**: Verify credentials, check network connectivity to cloud instance
 - **Chat Persistence**: Ensure Supabase credentials are correct, check database table setup

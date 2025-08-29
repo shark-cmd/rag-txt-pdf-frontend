@@ -1,5 +1,6 @@
 import express from 'express';
 import multer from 'multer';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import logger from './config/logger.js';
@@ -15,8 +16,25 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Configure file upload
-const upload = multer({ storage: multer.memoryStorage() });
+// Ensure uploads directory exists
+const UPLOAD_DIR = process.env.UPLOAD_DIR || 'uploads';
+try {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+} catch {}
+
+// Configure file upload to disk with higher limits
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+  filename: (_req, file, cb) => cb(null, `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${file.originalname}`)
+});
+
+const upload = multer({
+  storage,
+  limits: {
+    files: parseInt(process.env.UPLOAD_MAX_FILES || '1000', 10),
+    fileSize: parseInt(process.env.UPLOAD_MAX_FILESIZE_BYTES || String(50 * 1024 * 1024), 10) // 50MB default
+  }
+});
 
 // Initialize RAG service
 let ragService;
@@ -29,7 +47,9 @@ async function initializeApp() {
 
     // Progress SSE
     const progressModule = await import('./services/progress.js');
-    const { sseHandler, emitProgress } = progressModule;
+    const { sseHandler, emitProgress, emitDone } = progressModule;
+    const ingestionQueueModule = await import('./services/ingestionQueue.js');
+    const ingestionQueue = ingestionQueueModule.default;
 
     // --- API Routes ---
 
@@ -41,20 +61,66 @@ async function initializeApp() {
     // SSE channel for progress
     app.get('/api/progress/:opId', sseHandler);
 
-    // Ingest documents from file upload
-    app.post('/api/documents', upload.array('document', 10), async (req, res, next) => {
+    // Ingest documents from file upload (enqueue for background processing)
+    app.post('/api/documents', upload.array('document', parseInt(process.env.UPLOAD_MAX_FILES || '1000', 10)), async (req, res, next) => {
       try {
-        const { opId, removeTimestamps } = req.query;
+        const { opId, removeTimestamps, collectionName } = req.query;
         if (!req.files || req.files.length === 0) {
           return res.status(400).json({ error: 'No files uploaded' });
+        }
+
+        if (collectionName) {
+          try {
+            await ragService.useCollection(String(collectionName));
+            emitProgress?.(opId, `Using collection: ${collectionName}`);
+          } catch (err) {
+            emitProgress?.(opId, `Warning: Failed to prepare collection '${collectionName}': ${err.message}`);
+          }
         }
 
         const fileNames = req.files.map(file => file.originalname).join(', ');
         emitProgress?.(opId, `Uploading ${req.files.length} files: ${fileNames}`);
 
-        const result = await ragService.processFile(req.files, opId, removeTimestamps === 'true');
-        emitProgress?.(opId, `Files processed: ${fileNames}`, result);
-        res.status(201).json(result);
+        const tasks = req.files.map((file, index) =>
+          ingestionQueue.add(async () => {
+            emitProgress?.(opId, `Queued file ${index + 1}/${req.files.length}: ${file.originalname}`);
+            try {
+              const result = await ragService.processFile([file], opId, removeTimestamps === 'true', { suppressDone: true });
+              emitProgress?.(opId, `Processed: ${file.originalname}`, result);
+              return result;
+            } catch (err) {
+              emitProgress?.(opId, `Error processing ${file.originalname}: ${err.message || String(err)}`);
+              throw err;
+            }
+          })
+        );
+
+        // Finalize when all queued tasks are done (do not block response)
+        Promise.allSettled(tasks).then((results) => {
+          const success = results.filter(r => r.status === 'fulfilled').length;
+          const failed = results.filter(r => r.status === 'rejected').length;
+          emitProgress?.(opId, `Completed ingestion. Success: ${success}, Failed: ${failed}`);
+          emitDone?.(opId, { success: failed === 0, processed: success, failed });
+        }).catch((err) => {
+          emitProgress?.(opId, `Error finalizing ingestion: ${err.message || String(err)}`);
+          emitDone?.(opId, { success: false, error: err.message || String(err) });
+        });
+
+        res.status(202).json({ enqueued: req.files.length, collection: collectionName || ragService.collectionName });
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    // Switch default collection
+    app.post('/api/collections/use', async (req, res, next) => {
+      try {
+        const { collectionName } = req.body;
+        if (!collectionName) {
+          return res.status(400).json({ error: 'collectionName is required' });
+        }
+        await ragService.useCollection(String(collectionName));
+        res.json({ success: true, collectionName: ragService.collectionName });
       } catch (error) {
         next(error);
       }
@@ -97,11 +163,11 @@ async function initializeApp() {
     // Query endpoint
     app.post('/api/query', async (req, res, next) => {
       try {
-        const { question } = req.body;
+        const { question, topK } = req.body;
         if (!question) {
           return res.status(400).json({ error: 'Question is required' });
         }
-        const answer = await ragService.query(question);
+        const answer = await ragService.query(question, { topK: typeof topK === 'number' ? topK : undefined });
         res.json({ answer });
       } catch (error) {
         next(error);
@@ -158,6 +224,16 @@ async function initializeApp() {
     app.get('/api/qdrant-cloud/status', async (req, res, next) => {
       try {
         const result = await ragService.getQdrantCloudStatus();
+        res.json(result);
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    // List collections
+    app.get('/api/collections', async (req, res, next) => {
+      try {
+        const result = await ragService.listCollections();
         res.json(result);
       } catch (error) {
         next(error);

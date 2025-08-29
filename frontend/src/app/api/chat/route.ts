@@ -1,15 +1,18 @@
 import axios from 'axios';
 
 export async function POST(req: Request) {
-    const { messages, excludedSources } = await req.json();
+    const { messages, excludedSources, topK, backendUrl: overrideBackend } = await req.json();
     const lastMessage = messages[messages.length - 1];
 
     try {
         // Call our backend API
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+        const backendUrl = (overrideBackend && typeof overrideBackend === 'string' && overrideBackend.length > 0)
+            ? overrideBackend
+            : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3100');
         const response = await axios.post(`${backendUrl}/api/query`, {
             question: lastMessage.content,
-            excludedSources: excludedSources || []
+            excludedSources: excludedSources || [],
+            topK: typeof topK === 'number' ? topK : undefined,
         });
 
         const answer = response.data.answer?.response || response.data.answer || response.data.response || 'No answer returned.';

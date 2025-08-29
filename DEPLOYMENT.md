@@ -173,6 +173,43 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
 ### Backend (.env)
+## 🚀 One-Command Deploy Scripts
+
+### Frontend → Vercel
+
+Script: `scripts/deploy-frontend-vercel.sh`
+
+Prereqs:
+- Create a Vercel token and export it: `export VERCEL_TOKEN=...`
+- Optionally: `export VERCEL_ORG_ID=...` and `export VERCEL_PROJECT_ID=...`
+
+Usage:
+```bash
+chmod +x scripts/deploy-frontend-vercel.sh
+ENVIRONMENT=production VERCEL_TOKEN=$VERCEL_TOKEN ./scripts/deploy-frontend-vercel.sh
+```
+
+Notes:
+- Uses `vercel pull`, `vercel build`, then `vercel deploy --prebuilt` non-interactively.
+- Set `FRONTEND_DIR=frontend` if your path differs.
+
+### Backend → Railway
+
+Script: `scripts/deploy-backend-railway.sh`
+
+Prereqs:
+- Create a Railway token and export it: `export RAILWAY_TOKEN=...`
+
+Usage:
+```bash
+chmod +x scripts/deploy-backend-railway.sh
+RAILWAY_TOKEN=$RAILWAY_TOKEN ./scripts/deploy-backend-railway.sh
+```
+
+Notes:
+- Uses `railway up` to link/create the project and `railway deploy` non-interactively.
+- Set `BACKEND_DIR=backend` and `RAILWAY_SERVICE=backend` to override defaults.
+
 ```env
 GOOGLE_API_KEY=your_google_api_key
 QDRANT_URL=https://your-qdrant-cloud-url

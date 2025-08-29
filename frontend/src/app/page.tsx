@@ -4,8 +4,9 @@ import type { NextPage } from 'next';
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { SimpleChat } from '../components/SimpleChat';
+import { CollectionsManager } from '../components/CollectionsManager';
 
-const API_URL = 'https://rag-personallm-plus-production.up.railway.app/api';
+const REMOTE_BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
 const Home: NextPage = () => {
   const [textInput, setTextInput] = useState('');
@@ -39,6 +40,15 @@ const Home: NextPage = () => {
   // State for source filtering
   const [excludedSources, setExcludedSources] = useState<Set<string>>(new Set());
   const [showSourceFilters, setShowSourceFilters] = useState(false);
+  const [topK, setTopK] = useState<number>(4);
+  const [backendMode, setBackendMode] = useState<'local' | 'remote'>(REMOTE_BACKEND ? 'remote' : 'local');
+  const [collections, setCollections] = useState<string[]>([]);
+  const [activeCollection, setActiveCollection] = useState<string>('documents');
+  const [isLoadingCollections, setIsLoadingCollections] = useState(false);
+
+  const API_URL = backendMode === 'local'
+    ? 'http://localhost:3100/api'
+    : `${REMOTE_BACKEND.replace(/\/$/, '')}/api`;
 
   useEffect(() => {
     return () => {
@@ -54,7 +64,36 @@ const Home: NextPage = () => {
   useEffect(() => {
     fetchAllDocuments();
     checkCloudConnectionStatus();
+    fetchCollections();
   }, []);
+
+  const fetchCollections = async () => {
+    setIsLoadingCollections(true);
+    try {
+      const res = await axios.get(`${API_URL}/collections`);
+      if (res.data?.success) {
+        setCollections(res.data.collections || []);
+        if (res.data.active) setActiveCollection(res.data.active);
+      }
+    } catch (e) {
+      console.error('Failed to fetch collections', e);
+    } finally {
+      setIsLoadingCollections(false);
+    }
+  };
+
+  const switchCollection = async (name: string) => {
+    if (!name || name === activeCollection) return;
+    try {
+      await axios.post(`${API_URL}/collections/use`, { collectionName: name });
+      setActiveCollection(name);
+      // Refresh docs list under new collection
+      await fetchAllDocuments();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to switch collection';
+      setError(message);
+    }
+  };
 
   const checkCloudConnectionStatus = async () => {
     try {
@@ -250,7 +289,7 @@ const Home: NextPage = () => {
       const formData = new FormData();
       files.forEach(file => formData.append('document', file));
       await axios.post(`${API_URL}/documents`, formData, {
-        params: { opId, removeTimestamps },
+        params: { opId, removeTimestamps, collectionName: activeCollection },
         headers: { 'Content-Type': 'multipart/form-data' },
       });
     } catch (err) {
@@ -493,6 +532,61 @@ const Home: NextPage = () => {
             </div>
           </div>
 
+          {/* Retrieval Settings */}
+          <div className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-lg p-4">
+            <div className="flex items-center gap-2 text-white mb-3">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 16v-2m8-6h2M2 12H4m12.364-5.364l1.414-1.414M6.222 17.778l-1.414 1.414m0-12.728L6.222 7.05m11.556 11.556l1.414 1.414" />
+              </svg>
+              <h3 className="font-semibold">Retrieval Settings</h3>
+            </div>
+            <label className="text-xs text-white/80 block mb-1">Top K (documents)</label>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={topK}
+              onChange={(e) => setTopK(Math.max(1, Math.min(50, parseInt(e.target.value || '1', 10))))}
+              className="w-full bg-white/5 border border-white/20 text-white placeholder:text-white/40 focus:border-indigo-400 focus:ring-indigo-400/20 rounded-md p-2 text-sm"
+            />
+          </div>
+
+          {/* Backend API Target */}
+          <div className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-lg p-4">
+            <div className="flex items-center gap-2 text-white mb-3">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-7 4h8M5 8h14" />
+              </svg>
+              <h3 className="font-semibold">Backend API</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setBackendMode('local')}
+                className={`text-xs rounded px-2 py-1 border transition-colors ${backendMode === 'local' ? 'bg-green-500/20 text-green-300 border-green-500/30' : 'bg-white/10 text-white/70 border-white/20 hover:bg-white/20'}`}
+              >
+                Local (http://localhost:3100)
+              </button>
+              <button
+                onClick={() => setBackendMode('remote')}
+                disabled={!REMOTE_BACKEND}
+                className={`text-xs rounded px-2 py-1 border transition-colors ${backendMode === 'remote' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' : 'bg-white/10 text-white/70 border-white/20 hover:bg-white/20'} ${!REMOTE_BACKEND ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={REMOTE_BACKEND ? `Using ${REMOTE_BACKEND}` : 'Set NEXT_PUBLIC_BACKEND_URL to enable'}
+              >
+                Remote (Vercel)
+              </button>
+            </div>
+            <div className="text-xs text-white/60 mt-2 truncate">Active: {API_URL}</div>
+          </div>
+
+          <CollectionsManager
+            apiUrl={API_URL}
+            activeCollection={activeCollection}
+            onActiveChange={async (name) => {
+              setActiveCollection(name);
+              await fetchAllDocuments();
+            }}
+          />
+
           {/* Sources Section */}
           <div className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
@@ -726,6 +820,8 @@ const Home: NextPage = () => {
             console.log('Sources updated:', sources);
           }}
           excludedSources={Array.from(excludedSources)}
+          topK={topK}
+          backendUrl={API_URL.replace(/\/$/, '').replace(/\/api$/, '')}
         />
       </main>
     </div>

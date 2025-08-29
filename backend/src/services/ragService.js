@@ -18,6 +18,7 @@ import { emitProgress, emitDone } from './progress.js';
 import websiteCrawler from './websiteCrawler.js';
 import { SYSTEM_PROMPT, QUERY_PROMPT } from '../prompts/systemPrompt.js';
 import { getModelConfig } from '../config/promptConfig.js';
+import fs from 'fs';
 
 class RAGService {
   constructor() {
@@ -53,6 +54,11 @@ class RAGService {
         ''         // Characters
       ],
     });
+
+    // Cache Qdrant health
+    this.qdrantUrl = process.env.QDRANT_URL;
+    this.lastQdrantHealthCheckAt = 0;
+    this.lastQdrantHealthy = false;
   }
 
   // Helper function to process subtitle files with better structure preservation
@@ -102,6 +108,86 @@ class RAGService {
     }
 
     return processedLines.join('\n');
+  }
+
+  // Switch the active collection, creating it if needed
+  async useCollection(collectionName) {
+    if (!collectionName || typeof collectionName !== 'string') return;
+    if (this.collectionName === collectionName) return;
+    const url = this.isUsingCloud && this.cloudConfig?.url ? this.cloudConfig.url : process.env.QDRANT_URL;
+    const apiKey = this.isUsingCloud && this.cloudConfig?.apiKey ? this.cloudConfig.apiKey : undefined;
+
+    this.vectorStore = new QdrantVectorStore(this.embeddings, {
+      url,
+      apiKey,
+      collectionName,
+    });
+    this.collectionName = collectionName;
+
+    try {
+      // Ensure collection exists or create it with configured vector size
+      await this.vectorStore.client.getCollection(collectionName);
+    } catch (e) {
+      const vectorSize = parseInt(process.env.QDRANT_VECTOR_SIZE || '768', 10);
+      try {
+        await this.vectorStore.client.createCollection(collectionName, {
+          vectors: { size: vectorSize, distance: 'Cosine' },
+        });
+        logger.info(`Created Qdrant collection '${collectionName}' with size=${vectorSize}`);
+      } catch (err) {
+        logger.warn(`Could not create collection '${collectionName}': ${err.message}. It may be auto-created by the vector store on first write.`);
+      }
+    }
+  }
+
+  async ensureCollectionExists(collectionName) {
+    try {
+      await this.vectorStore.client.getCollection(collectionName);
+      return true;
+    } catch {
+      const vectorSize = parseInt(process.env.QDRANT_VECTOR_SIZE || '768', 10);
+      try {
+        await this.vectorStore.client.createCollection(collectionName, {
+          vectors: { size: vectorSize, distance: 'Cosine' },
+        });
+        logger.info(`Created Qdrant collection '${collectionName}' with size=${vectorSize}`);
+        return true;
+      } catch (err) {
+        logger.error(`Failed to ensure collection '${collectionName}': ${err.message}`);
+        return false;
+      }
+    }
+  }
+
+  // Quick health check for Qdrant to avoid hanging writes
+  async isQdrantAvailable(timeoutMs = 5000) {
+    try {
+      const now = Date.now();
+      if (now - this.lastQdrantHealthCheckAt < 10000) {
+        return this.lastQdrantHealthy;
+      }
+      // Prefer cloud URL if connected
+      const urlToCheck = this.isUsingCloud && this.cloudConfig?.url ? this.cloudConfig.url : this.qdrantUrl;
+      const apiKey = this.isUsingCloud && this.cloudConfig?.apiKey ? this.cloudConfig.apiKey : undefined;
+      if (!urlToCheck) {
+        this.lastQdrantHealthy = false;
+        this.lastQdrantHealthCheckAt = now;
+        return false;
+      }
+      const signal = AbortSignal.timeout(timeoutMs);
+      const res = await fetch(`${urlToCheck.replace(/\/$/, '')}/collections`, {
+        method: 'GET',
+        signal,
+        headers: apiKey ? { 'api-key': apiKey } : undefined,
+      });
+      this.lastQdrantHealthy = res.ok;
+      this.lastQdrantHealthCheckAt = now;
+      return res.ok;
+    } catch (e) {
+      this.lastQdrantHealthy = false;
+      this.lastQdrantHealthCheckAt = Date.now();
+      return false;
+    }
   }
 
   // Helper function to improve text formatting for better readability
@@ -222,6 +308,8 @@ class RAGService {
       emitProgress?.(opId, 'Chunking all pages...');
       const chunks = await this.textSplitter.splitDocuments(allDocs);
 
+      // Ensure collection exists
+      await this.ensureCollectionExists(this.collectionName);
       emitProgress?.(opId, `Storing ${chunks.length} chunks from ${allDocs.length} pages`);
       await this.vectorStore.addDocuments(chunks);
 
@@ -241,41 +329,52 @@ class RAGService {
     } catch (error) {
       logger.error(`Error processing URL ${url}: ${error.message}`);
       emitProgress?.(opId, `Error: ${error.message}`);
+      emitDone?.(opId, { done: true, success: false, error: error.message });
       throw error;
     }
   }
 
-  async processFile(files, opId, removeTimestamps = false) {
+  async processFile(files, opId, removeTimestamps = false, options = {}) {
     try {
+      const suppressDone = options?.suppressDone === true;
       const fileArray = Array.isArray(files) ? files : [files];
       let totalChunks = 0;
       const allSources = [];
 
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i];
-        const { originalname, mimetype, buffer } = file;
+        const { originalname, mimetype, buffer, path } = file;
 
         emitProgress?.(opId, `Processing file ${i + 1}/${fileArray.length}: ${originalname}`);
 
         let textContent = '';
+        let fileBuffer = buffer;
+        if (!fileBuffer && path) {
+          try {
+            fileBuffer = await fs.promises.readFile(path);
+          } catch (e) {
+            throw new Error(`Failed to read uploaded file from disk: ${originalname}`);
+          }
+        }
 
-        if (mimetype === 'application/pdf') {
+        try {
+          if (mimetype === 'application/pdf') {
           emitProgress?.(opId, 'Extracting text from PDF');
           // Dynamic import from the library path to avoid module-side file reads
           const pdfModule = await import('pdf-parse/lib/pdf-parse.js');
           const pdfParse = pdfModule.default || pdfModule;
-          const data = await pdfParse(buffer);
+          const data = await pdfParse(fileBuffer);
           textContent = data.text || '';
         } else if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
           emitProgress?.(opId, 'Extracting text from DOCX');
-          const result = await mammoth.extractRawText({ buffer });
+          const result = await mammoth.extractRawText({ buffer: fileBuffer });
           textContent = result.value || '';
         } else if (mimetype === 'text/plain' || originalname.endsWith('.txt') || originalname.endsWith('.md')) {
           emitProgress?.(opId, 'Reading text file');
-          textContent = buffer.toString('utf8');
+          textContent = fileBuffer.toString('utf8');
         } else if (mimetype === 'text/csv' || originalname.endsWith('.csv')) {
           emitProgress?.(opId, 'Processing CSV file');
-          const csvText = buffer.toString('utf8');
+          const csvText = fileBuffer.toString('utf8');
           // Convert CSV to readable text format
           const lines = csvText.split('\n');
           const processedLines = lines.map(line => {
@@ -286,31 +385,41 @@ class RAGService {
           textContent = processedLines.join('\n');
         } else if (originalname.endsWith('.vtt')) {
           emitProgress?.(opId, `Processing VTT subtitle file${removeTimestamps ? ' (removing timestamps)' : ' (keeping timestamps)'}`);
-          const vttText = buffer.toString('utf8');
+          const vttText = fileBuffer.toString('utf8');
           textContent = this.processSubtitleContent(vttText, 'vtt', removeTimestamps);
         } else if (originalname.endsWith('.srt')) {
           emitProgress?.(opId, `Processing SRT subtitle file${removeTimestamps ? ' (removing timestamps)' : ' (keeping timestamps)'}`);
-          const srtText = buffer.toString('utf8');
+          const srtText = fileBuffer.toString('utf8');
           textContent = this.processSubtitleContent(srtText, 'srt', removeTimestamps);
         } else {
           throw new Error(`Unsupported file type: ${mimetype} (${originalname})`);
         }
 
-        if (!textContent || !textContent.trim()) {
-          emitProgress?.(opId, `Warning: No extractable content found in ${originalname}`);
-          continue;
+          if (!textContent || !textContent.trim()) {
+            emitProgress?.(opId, `Warning: No extractable content found in ${originalname}`);
+            continue;
+          }
+
+          emitProgress?.(opId, `Chunking content from ${originalname}`);
+          const docs = [
+            new Document({ pageContent: textContent, metadata: { source: originalname, timestamp: new Date().toISOString() } }),
+          ];
+          const chunks = await this.textSplitter.splitDocuments(docs);
+          totalChunks += chunks.length;
+          allSources.push({ file: originalname });
+
+          const qdrantOk = await this.isQdrantAvailable(5000);
+          if (!qdrantOk) {
+            throw new Error('Vector database (Qdrant) is unreachable. Please check QDRANT_URL and connectivity.');
+          }
+          await this.ensureCollectionExists(this.collectionName);
+          emitProgress?.(opId, `Storing ${chunks.length} chunks from ${originalname}`);
+          await this.vectorStore.addDocuments(chunks);
+        } finally {
+          if (path) {
+            try { await fs.promises.unlink(path); } catch {}
+          }
         }
-
-        emitProgress?.(opId, `Chunking content from ${originalname}`);
-        const docs = [
-          new Document({ pageContent: textContent, metadata: { source: originalname } }),
-        ];
-        const chunks = await this.textSplitter.splitDocuments(docs);
-        totalChunks += chunks.length;
-        allSources.push({ file: originalname });
-
-        emitProgress?.(opId, `Storing ${chunks.length} chunks from ${originalname}`);
-        await this.vectorStore.addDocuments(chunks);
       }
 
       if (totalChunks === 0) {
@@ -318,11 +427,16 @@ class RAGService {
       }
 
       logger.info(`Successfully processed and stored content from ${fileArray.length} files`);
-      emitDone?.(opId, { chunksAdded: totalChunks, sources: allSources });
+      if (!suppressDone) {
+        emitDone?.(opId, { chunksAdded: totalChunks, sources: allSources });
+      }
       return { success: true, chunksAdded: totalChunks, sources: allSources };
     } catch (error) {
       logger.error(`Error processing files: ${error.message}`);
       emitProgress?.(opId, `Error: ${error.message}`);
+      if (!(options?.suppressDone)) {
+        emitDone?.(opId, { done: true, success: false, error: error.message });
+      }
       throw error;
     }
   }
@@ -333,6 +447,11 @@ class RAGService {
       emitProgress?.(opId, 'Chunking text');
       const docs = [new Document({ pageContent: text, metadata: { source: 'raw-text' } })];
       const chunks = await this.textSplitter.splitDocuments(docs);
+      const qdrantOk = await this.isQdrantAvailable(5000);
+      if (!qdrantOk) {
+        throw new Error('Vector database (Qdrant) is unreachable. Please check QDRANT_URL and connectivity.');
+      }
+      await this.ensureCollectionExists(this.collectionName);
       emitProgress?.(opId, `Storing ${chunks.length} chunks`);
       await this.vectorStore.addDocuments(chunks);
       logger.info(`Successfully processed and stored raw text input.`);
@@ -341,14 +460,17 @@ class RAGService {
     } catch (error) {
       logger.error(`Error processing raw text: ${error.message}`);
       emitProgress?.(opId, `Error: ${error.message}`);
+      emitDone?.(opId, { done: true, success: false, error: error.message });
       throw error;
     }
   }
 
-  async query(query) {
+  async query(query, options = {}) {
     try {
       logger.info(`Executing query: ${query}`);
-      const retriever = this.vectorStore.asRetriever();
+      const retriever = this.vectorStore.asRetriever({
+        k: typeof options.topK === 'number' && options.topK > 0 ? options.topK : undefined,
+      });
 
       const prompt = ChatPromptTemplate.fromTemplate(QUERY_PROMPT);
 
@@ -362,9 +484,7 @@ class RAGService {
         retriever,
       });
 
-      const result = await retrievalChain.invoke({
-        input: query,
-      });
+      const result = await retrievalChain.invoke({ input: query });
 
       // Improve the formatting of the response
       const formattedResponse = this.improveTextFormatting(result.answer);
@@ -512,6 +632,7 @@ class RAGService {
       this.collectionName = collectionName;
       this.isUsingCloud = true;
       this.cloudConfig = { url, apiKey, collectionName };
+      this.qdrantUrl = url;
 
       logger.info(`Successfully connected to Qdrant Cloud at ${url}`);
 
@@ -540,6 +661,7 @@ class RAGService {
       this.isUsingCloud = false;
       this.cloudConfig = null;
       this.collectionName = process.env.QDRANT_COLLECTION || 'documents';
+      this.qdrantUrl = process.env.QDRANT_URL;
 
       logger.info('Successfully disconnected from Qdrant Cloud');
 
@@ -566,6 +688,26 @@ class RAGService {
     } catch (error) {
       logger.error(`Error getting Qdrant Cloud status: ${error.message}`);
       throw error;
+    }
+  }
+
+  async listCollections() {
+    try {
+      const collections = await this.vectorStore.client.getCollections();
+      const names = (collections?.collections || []).map(c => c.name);
+      return {
+        success: true,
+        active: this.collectionName,
+        collections: names
+      };
+    } catch (error) {
+      logger.error(`Error listing collections: ${error.message}`);
+      return {
+        success: false,
+        active: this.collectionName,
+        collections: [],
+        error: error.message
+      };
     }
   }
 }
