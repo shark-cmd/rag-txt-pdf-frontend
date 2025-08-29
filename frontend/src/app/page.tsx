@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { SimpleChat } from '../components/SimpleChat';
 
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/api` : 'http://localhost:3100/api';
+const REMOTE_BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
 const Home: NextPage = () => {
   const [textInput, setTextInput] = useState('');
@@ -40,6 +40,11 @@ const Home: NextPage = () => {
   const [excludedSources, setExcludedSources] = useState<Set<string>>(new Set());
   const [showSourceFilters, setShowSourceFilters] = useState(false);
   const [topK, setTopK] = useState<number>(4);
+  const [backendMode, setBackendMode] = useState<'local' | 'remote'>(REMOTE_BACKEND ? 'remote' : 'local');
+
+  const API_URL = backendMode === 'local'
+    ? 'http://localhost:3100/api'
+    : `${REMOTE_BACKEND.replace(/\/$/, '')}/api`;
 
   useEffect(() => {
     return () => {
@@ -513,6 +518,33 @@ const Home: NextPage = () => {
             />
           </div>
 
+          {/* Backend API Target */}
+          <div className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-lg p-4">
+            <div className="flex items-center gap-2 text-white mb-3">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-7 4h8M5 8h14" />
+              </svg>
+              <h3 className="font-semibold">Backend API</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setBackendMode('local')}
+                className={`text-xs rounded px-2 py-1 border transition-colors ${backendMode === 'local' ? 'bg-green-500/20 text-green-300 border-green-500/30' : 'bg-white/10 text-white/70 border-white/20 hover:bg-white/20'}`}
+              >
+                Local (http://localhost:3100)
+              </button>
+              <button
+                onClick={() => setBackendMode('remote')}
+                disabled={!REMOTE_BACKEND}
+                className={`text-xs rounded px-2 py-1 border transition-colors ${backendMode === 'remote' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' : 'bg-white/10 text-white/70 border-white/20 hover:bg-white/20'} ${!REMOTE_BACKEND ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={REMOTE_BACKEND ? `Using ${REMOTE_BACKEND}` : 'Set NEXT_PUBLIC_BACKEND_URL to enable'}
+              >
+                Remote (Vercel)
+              </button>
+            </div>
+            <div className="text-xs text-white/60 mt-2 truncate">Active: {API_URL}</div>
+          </div>
+
           {/* Sources Section */}
           <div className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
@@ -747,6 +779,7 @@ const Home: NextPage = () => {
           }}
           excludedSources={Array.from(excludedSources)}
           topK={topK}
+          backendUrl={API_URL.replace(/\/$/, '').replace(/\/api$/, '')}
         />
       </main>
     </div>
