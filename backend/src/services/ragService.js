@@ -18,6 +18,7 @@ import { emitProgress, emitDone } from './progress.js';
 import websiteCrawler from './websiteCrawler.js';
 import { SYSTEM_PROMPT, QUERY_PROMPT } from '../prompts/systemPrompt.js';
 import { getModelConfig } from '../config/promptConfig.js';
+import fs from 'fs';
 
 class RAGService {
   constructor() {
@@ -275,37 +276,47 @@ class RAGService {
     }
   }
 
-  async processFile(files, opId, removeTimestamps = false) {
+  async processFile(files, opId, removeTimestamps = false, options = {}) {
     try {
+      const suppressDone = options?.suppressDone === true;
       const fileArray = Array.isArray(files) ? files : [files];
       let totalChunks = 0;
       const allSources = [];
 
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i];
-        const { originalname, mimetype, buffer } = file;
+        const { originalname, mimetype, buffer, path } = file;
 
         emitProgress?.(opId, `Processing file ${i + 1}/${fileArray.length}: ${originalname}`);
 
         let textContent = '';
+        let fileBuffer = buffer;
+        if (!fileBuffer && path) {
+          try {
+            fileBuffer = await fs.promises.readFile(path);
+          } catch (e) {
+            throw new Error(`Failed to read uploaded file from disk: ${originalname}`);
+          }
+        }
 
-        if (mimetype === 'application/pdf') {
+        try {
+          if (mimetype === 'application/pdf') {
           emitProgress?.(opId, 'Extracting text from PDF');
           // Dynamic import from the library path to avoid module-side file reads
           const pdfModule = await import('pdf-parse/lib/pdf-parse.js');
           const pdfParse = pdfModule.default || pdfModule;
-          const data = await pdfParse(buffer);
+          const data = await pdfParse(fileBuffer);
           textContent = data.text || '';
         } else if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
           emitProgress?.(opId, 'Extracting text from DOCX');
-          const result = await mammoth.extractRawText({ buffer });
+          const result = await mammoth.extractRawText({ buffer: fileBuffer });
           textContent = result.value || '';
         } else if (mimetype === 'text/plain' || originalname.endsWith('.txt') || originalname.endsWith('.md')) {
           emitProgress?.(opId, 'Reading text file');
-          textContent = buffer.toString('utf8');
+          textContent = fileBuffer.toString('utf8');
         } else if (mimetype === 'text/csv' || originalname.endsWith('.csv')) {
           emitProgress?.(opId, 'Processing CSV file');
-          const csvText = buffer.toString('utf8');
+          const csvText = fileBuffer.toString('utf8');
           // Convert CSV to readable text format
           const lines = csvText.split('\n');
           const processedLines = lines.map(line => {
@@ -316,35 +327,40 @@ class RAGService {
           textContent = processedLines.join('\n');
         } else if (originalname.endsWith('.vtt')) {
           emitProgress?.(opId, `Processing VTT subtitle file${removeTimestamps ? ' (removing timestamps)' : ' (keeping timestamps)'}`);
-          const vttText = buffer.toString('utf8');
+          const vttText = fileBuffer.toString('utf8');
           textContent = this.processSubtitleContent(vttText, 'vtt', removeTimestamps);
         } else if (originalname.endsWith('.srt')) {
           emitProgress?.(opId, `Processing SRT subtitle file${removeTimestamps ? ' (removing timestamps)' : ' (keeping timestamps)'}`);
-          const srtText = buffer.toString('utf8');
+          const srtText = fileBuffer.toString('utf8');
           textContent = this.processSubtitleContent(srtText, 'srt', removeTimestamps);
         } else {
           throw new Error(`Unsupported file type: ${mimetype} (${originalname})`);
         }
 
-        if (!textContent || !textContent.trim()) {
-          emitProgress?.(opId, `Warning: No extractable content found in ${originalname}`);
-          continue;
-        }
+          if (!textContent || !textContent.trim()) {
+            emitProgress?.(opId, `Warning: No extractable content found in ${originalname}`);
+            continue;
+          }
 
-        emitProgress?.(opId, `Chunking content from ${originalname}`);
-        const docs = [
-          new Document({ pageContent: textContent, metadata: { source: originalname } }),
-        ];
-        const chunks = await this.textSplitter.splitDocuments(docs);
-        totalChunks += chunks.length;
-        allSources.push({ file: originalname });
+          emitProgress?.(opId, `Chunking content from ${originalname}`);
+          const docs = [
+            new Document({ pageContent: textContent, metadata: { source: originalname, timestamp: new Date().toISOString() } }),
+          ];
+          const chunks = await this.textSplitter.splitDocuments(docs);
+          totalChunks += chunks.length;
+          allSources.push({ file: originalname });
 
-        const qdrantOk = await this.isQdrantAvailable(5000);
-        if (!qdrantOk) {
-          throw new Error('Vector database (Qdrant) is unreachable. Please check QDRANT_URL and connectivity.');
+          const qdrantOk = await this.isQdrantAvailable(5000);
+          if (!qdrantOk) {
+            throw new Error('Vector database (Qdrant) is unreachable. Please check QDRANT_URL and connectivity.');
+          }
+          emitProgress?.(opId, `Storing ${chunks.length} chunks from ${originalname}`);
+          await this.vectorStore.addDocuments(chunks);
+        } finally {
+          if (path) {
+            try { await fs.promises.unlink(path); } catch {}
+          }
         }
-        emitProgress?.(opId, `Storing ${chunks.length} chunks from ${originalname}`);
-        await this.vectorStore.addDocuments(chunks);
       }
 
       if (totalChunks === 0) {
@@ -352,12 +368,16 @@ class RAGService {
       }
 
       logger.info(`Successfully processed and stored content from ${fileArray.length} files`);
-      emitDone?.(opId, { chunksAdded: totalChunks, sources: allSources });
+      if (!suppressDone) {
+        emitDone?.(opId, { chunksAdded: totalChunks, sources: allSources });
+      }
       return { success: true, chunksAdded: totalChunks, sources: allSources };
     } catch (error) {
       logger.error(`Error processing files: ${error.message}`);
       emitProgress?.(opId, `Error: ${error.message}`);
-      emitDone?.(opId, { done: true, success: false, error: error.message });
+      if (!(options?.suppressDone)) {
+        emitDone?.(opId, { done: true, success: false, error: error.message });
+      }
       throw error;
     }
   }
