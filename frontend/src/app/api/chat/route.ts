@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 export async function POST(req: Request) {
-    const { messages, excludedSources } = await req.json();
+    const { messages, excludedSources, topK } = await req.json();
     const lastMessage = messages[messages.length - 1];
 
     try {
@@ -9,7 +9,8 @@ export async function POST(req: Request) {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3100';
         const response = await axios.post(`${backendUrl}/api/query`, {
             question: lastMessage.content,
-            excludedSources: excludedSources || []
+            excludedSources: excludedSources || [],
+            topK: typeof topK === 'number' ? topK : undefined,
         });
 
         const answer = response.data.answer?.response || response.data.answer || response.data.response || 'No answer returned.';

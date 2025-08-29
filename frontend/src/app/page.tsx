@@ -39,6 +39,7 @@ const Home: NextPage = () => {
   // State for source filtering
   const [excludedSources, setExcludedSources] = useState<Set<string>>(new Set());
   const [showSourceFilters, setShowSourceFilters] = useState(false);
+  const [topK, setTopK] = useState<number>(4);
 
   useEffect(() => {
     return () => {
@@ -493,6 +494,25 @@ const Home: NextPage = () => {
             </div>
           </div>
 
+          {/* Retrieval Settings */}
+          <div className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-lg p-4">
+            <div className="flex items-center gap-2 text-white mb-3">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 16v-2m8-6h2M2 12H4m12.364-5.364l1.414-1.414M6.222 17.778l-1.414 1.414m0-12.728L6.222 7.05m11.556 11.556l1.414 1.414" />
+              </svg>
+              <h3 className="font-semibold">Retrieval Settings</h3>
+            </div>
+            <label className="text-xs text-white/80 block mb-1">Top K (documents)</label>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={topK}
+              onChange={(e) => setTopK(Math.max(1, Math.min(50, parseInt(e.target.value || '1', 10))))}
+              className="w-full bg-white/5 border border-white/20 text-white placeholder:text-white/40 focus:border-indigo-400 focus:ring-indigo-400/20 rounded-md p-2 text-sm"
+            />
+          </div>
+
           {/* Sources Section */}
           <div className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
@@ -726,6 +746,7 @@ const Home: NextPage = () => {
             console.log('Sources updated:', sources);
           }}
           excludedSources={Array.from(excludedSources)}
+          topK={topK}
         />
       </main>
     </div>

@@ -435,10 +435,12 @@ class RAGService {
     }
   }
 
-  async query(query) {
+  async query(query, options = {}) {
     try {
       logger.info(`Executing query: ${query}`);
-      const retriever = this.vectorStore.asRetriever();
+      const retriever = this.vectorStore.asRetriever({
+        k: typeof options.topK === 'number' && options.topK > 0 ? options.topK : undefined,
+      });
 
       const prompt = ChatPromptTemplate.fromTemplate(QUERY_PROMPT);
 
@@ -452,9 +454,7 @@ class RAGService {
         retriever,
       });
 
-      const result = await retrievalChain.invoke({
-        input: query,
-      });
+      const result = await retrievalChain.invoke({ input: query });
 
       // Improve the formatting of the response
       const formattedResponse = this.improveTextFormatting(result.answer);

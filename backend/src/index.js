@@ -163,11 +163,11 @@ async function initializeApp() {
     // Query endpoint
     app.post('/api/query', async (req, res, next) => {
       try {
-        const { question } = req.body;
+        const { question, topK } = req.body;
         if (!question) {
           return res.status(400).json({ error: 'Question is required' });
         }
-        const answer = await ragService.query(question);
+        const answer = await ragService.query(question, { topK: typeof topK === 'number' ? topK : undefined });
         res.json({ answer });
       } catch (error) {
         next(error);
