@@ -64,9 +64,18 @@ async function initializeApp() {
     // Ingest documents from file upload (enqueue for background processing)
     app.post('/api/documents', upload.array('document', parseInt(process.env.UPLOAD_MAX_FILES || '1000', 10)), async (req, res, next) => {
       try {
-        const { opId, removeTimestamps } = req.query;
+        const { opId, removeTimestamps, collectionName } = req.query;
         if (!req.files || req.files.length === 0) {
           return res.status(400).json({ error: 'No files uploaded' });
+        }
+
+        if (collectionName) {
+          try {
+            await ragService.useCollection(String(collectionName));
+            emitProgress?.(opId, `Using collection: ${collectionName}`);
+          } catch (err) {
+            emitProgress?.(opId, `Warning: Failed to prepare collection '${collectionName}': ${err.message}`);
+          }
         }
 
         const fileNames = req.files.map(file => file.originalname).join(', ');
@@ -97,7 +106,21 @@ async function initializeApp() {
           emitDone?.(opId, { success: false, error: err.message || String(err) });
         });
 
-        res.status(202).json({ enqueued: req.files.length });
+        res.status(202).json({ enqueued: req.files.length, collection: collectionName || ragService.collectionName });
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    // Switch default collection
+    app.post('/api/collections/use', async (req, res, next) => {
+      try {
+        const { collectionName } = req.body;
+        if (!collectionName) {
+          return res.status(400).json({ error: 'collectionName is required' });
+        }
+        await ragService.useCollection(String(collectionName));
+        res.json({ success: true, collectionName: ragService.collectionName });
       } catch (error) {
         next(error);
       }

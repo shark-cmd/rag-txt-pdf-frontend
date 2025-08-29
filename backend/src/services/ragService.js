@@ -110,6 +110,36 @@ class RAGService {
     return processedLines.join('\n');
   }
 
+  // Switch the active collection, creating it if needed
+  async useCollection(collectionName) {
+    if (!collectionName || typeof collectionName !== 'string') return;
+    if (this.collectionName === collectionName) return;
+    const url = this.isUsingCloud && this.cloudConfig?.url ? this.cloudConfig.url : process.env.QDRANT_URL;
+    const apiKey = this.isUsingCloud && this.cloudConfig?.apiKey ? this.cloudConfig.apiKey : undefined;
+
+    this.vectorStore = new QdrantVectorStore(this.embeddings, {
+      url,
+      apiKey,
+      collectionName,
+    });
+    this.collectionName = collectionName;
+
+    try {
+      // Ensure collection exists or create it with configured vector size
+      await this.vectorStore.client.getCollection(collectionName);
+    } catch (e) {
+      const vectorSize = parseInt(process.env.QDRANT_VECTOR_SIZE || '768', 10);
+      try {
+        await this.vectorStore.client.createCollection(collectionName, {
+          vectors: { size: vectorSize, distance: 'Cosine' },
+        });
+        logger.info(`Created Qdrant collection '${collectionName}' with size=${vectorSize}`);
+      } catch (err) {
+        logger.warn(`Could not create collection '${collectionName}': ${err.message}. It may be auto-created by the vector store on first write.`);
+      }
+    }
+  }
+
   // Quick health check for Qdrant to avoid hanging writes
   async isQdrantAvailable(timeoutMs = 5000) {
     try {
