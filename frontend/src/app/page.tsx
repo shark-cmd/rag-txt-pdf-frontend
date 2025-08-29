@@ -4,6 +4,7 @@ import type { NextPage } from 'next';
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { SimpleChat } from '../components/SimpleChat';
+import { CollectionsManager } from '../components/CollectionsManager';
 
 const REMOTE_BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
@@ -577,67 +578,14 @@ const Home: NextPage = () => {
             <div className="text-xs text-white/60 mt-2 truncate">Active: {API_URL}</div>
           </div>
 
-          {/* Collections */}
-          <div className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2 text-white">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18" />
-                </svg>
-                <h3 className="font-semibold">Collections</h3>
-              </div>
-              <button
-                onClick={fetchCollections}
-                disabled={isLoadingCollections}
-                className="text-xs bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded px-2 py-1 transition-colors disabled:opacity-50"
-              >
-                {isLoadingCollections ? 'Loading...' : 'Refresh'}
-              </button>
-            </div>
-
-            {/* Active + Switch */}
-            <div className="mb-3">
-              <label className="text-xs text-white/80 block mb-1">Active Collection</label>
-              <select
-                value={activeCollection}
-                onChange={(e) => switchCollection(e.target.value)}
-                className="w-full bg-white/5 border border-white/20 text-white focus:border-indigo-400 focus:ring-indigo-400/20 rounded-md p-2 text-sm"
-              >
-                {[activeCollection, ...collections.filter(c => c !== activeCollection)].map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Create New */}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="New collection name"
-                onKeyDown={async (e) => {
-                  if (e.key === 'Enter') {
-                    const name = (e.target as HTMLInputElement).value.trim();
-                    if (!name) return;
-                    await switchCollection(name);
-                    await fetchCollections();
-                    (e.target as HTMLInputElement).value = '';
-                  }
-                }}
-                className="flex-1 bg-white/5 border border-white/20 text-white placeholder:text-white/40 focus:border-indigo-400 focus:ring-indigo-400/20 rounded-md p-2 text-sm"
-              />
-              <button
-                onClick={async () => {
-                  const input = (document.activeElement as HTMLInputElement);
-                  const name = input?.value?.trim();
-                  if (!name) return;
-                  await switchCollection(name);
-                  await fetchCollections();
-                  if (input) input.value = '';
-                }}
-                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0 rounded-md px-3 text-sm"
-              >Create/Use</button>
-            </div>
-          </div>
+          <CollectionsManager
+            apiUrl={API_URL}
+            activeCollection={activeCollection}
+            onActiveChange={async (name) => {
+              setActiveCollection(name);
+              await fetchAllDocuments();
+            }}
+          />
 
           {/* Sources Section */}
           <div className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-lg p-4">
