@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { SimpleChat } from '../components/SimpleChat';
 
-const API_URL = 'https://rag-personallm-plus-production.up.railway.app/api';
+const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/api` : 'http://localhost:3100/api';
 
 const Home: NextPage = () => {
   const [textInput, setTextInput] = useState('');

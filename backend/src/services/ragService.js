@@ -53,6 +53,11 @@ class RAGService {
         ''         // Characters
       ],
     });
+
+    // Cache Qdrant health
+    this.qdrantUrl = process.env.QDRANT_URL;
+    this.lastQdrantHealthCheckAt = 0;
+    this.lastQdrantHealthy = false;
   }
 
   // Helper function to process subtitle files with better structure preservation
@@ -102,6 +107,30 @@ class RAGService {
     }
 
     return processedLines.join('\n');
+  }
+
+  // Quick health check for Qdrant to avoid hanging writes
+  async isQdrantAvailable(timeoutMs = 5000) {
+    try {
+      const now = Date.now();
+      if (now - this.lastQdrantHealthCheckAt < 10000) {
+        return this.lastQdrantHealthy;
+      }
+      if (!this.qdrantUrl) {
+        this.lastQdrantHealthy = false;
+        this.lastQdrantHealthCheckAt = now;
+        return false;
+      }
+      const signal = AbortSignal.timeout(timeoutMs);
+      const res = await fetch(`${this.qdrantUrl.replace(/\/$/, '')}/collections`, { method: 'GET', signal });
+      this.lastQdrantHealthy = res.ok;
+      this.lastQdrantHealthCheckAt = now;
+      return res.ok;
+    } catch (e) {
+      this.lastQdrantHealthy = false;
+      this.lastQdrantHealthCheckAt = Date.now();
+      return false;
+    }
   }
 
   // Helper function to improve text formatting for better readability
@@ -241,6 +270,7 @@ class RAGService {
     } catch (error) {
       logger.error(`Error processing URL ${url}: ${error.message}`);
       emitProgress?.(opId, `Error: ${error.message}`);
+      emitDone?.(opId, { done: true, success: false, error: error.message });
       throw error;
     }
   }
@@ -309,6 +339,10 @@ class RAGService {
         totalChunks += chunks.length;
         allSources.push({ file: originalname });
 
+        const qdrantOk = await this.isQdrantAvailable(5000);
+        if (!qdrantOk) {
+          throw new Error('Vector database (Qdrant) is unreachable. Please check QDRANT_URL and connectivity.');
+        }
         emitProgress?.(opId, `Storing ${chunks.length} chunks from ${originalname}`);
         await this.vectorStore.addDocuments(chunks);
       }
@@ -323,6 +357,7 @@ class RAGService {
     } catch (error) {
       logger.error(`Error processing files: ${error.message}`);
       emitProgress?.(opId, `Error: ${error.message}`);
+      emitDone?.(opId, { done: true, success: false, error: error.message });
       throw error;
     }
   }
@@ -333,6 +368,10 @@ class RAGService {
       emitProgress?.(opId, 'Chunking text');
       const docs = [new Document({ pageContent: text, metadata: { source: 'raw-text' } })];
       const chunks = await this.textSplitter.splitDocuments(docs);
+      const qdrantOk = await this.isQdrantAvailable(5000);
+      if (!qdrantOk) {
+        throw new Error('Vector database (Qdrant) is unreachable. Please check QDRANT_URL and connectivity.');
+      }
       emitProgress?.(opId, `Storing ${chunks.length} chunks`);
       await this.vectorStore.addDocuments(chunks);
       logger.info(`Successfully processed and stored raw text input.`);
@@ -341,6 +380,7 @@ class RAGService {
     } catch (error) {
       logger.error(`Error processing raw text: ${error.message}`);
       emitProgress?.(opId, `Error: ${error.message}`);
+      emitDone?.(opId, { done: true, success: false, error: error.message });
       throw error;
     }
   }
