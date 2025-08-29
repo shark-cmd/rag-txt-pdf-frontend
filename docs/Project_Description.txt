@@ -1,0 +1,55 @@
+# Project Description
+
+This project implements a Retrieval-Augmented Generation (RAG) service using LangChain, Qdrant, and Google Gemini.
+
+## Architecture
+- Backend (Node.js, Express):
+  - Loads content from web pages, PDFs, DOCX, and plain text
+  - Splits documents into chunks and stores embeddings in Qdrant
+  - Answers user queries by retrieving relevant chunks and generating responses with Gemini
+- Vector Store: Qdrant (REST)
+- LLM/Embeddings: Google Generative AI (Gemini)
+- Frontend: Next.js (served separately)
+
+## Key Backend Components
+- `backend/src/index.js`: Express app setup, routes, and initialization
+- `backend/src/services/ragService.js`: Core RAG logic
+  - Loaders:
+    - Web: `CheerioWebBaseLoader` from `@langchain/community/document_loaders/web/cheerio`
+    - PDF: `PDFLoader` from `@langchain/community/document_loaders/fs/pdf`
+    - DOCX: `DocxLoader` from `@langchain/community/document_loaders/fs/docx`
+    - TXT: Directly constructs `Document` from Blob text (no TextLoader import)
+  - Splitting: `RecursiveCharacterTextSplitter`
+  - Embeddings: `GoogleGenerativeAIEmbeddings` (model `embedding-001`)
+  - Vector store: `QdrantVectorStore` (constructed as `(embeddings, { url, collectionName })`)
+  - Chat model: `ChatGoogleGenerativeAI` (model `gemini-1.5-flash`)
+
+## API Endpoints (Backend)
+- `GET /api/health`: Health check
+- `POST /api/documents` (multipart/form-data, field `document`): Ingest file (PDF/DOCX/TXT)
+- `POST /api/crawl` (JSON: `{ url }`): Ingest a webpage
+- `POST /api/text` (JSON: `{ text }`): Ingest raw text
+- `POST /api/query` (JSON: `{ question }`): Query RAG chain
+
+## Environment Variables
+- `GOOGLE_API_KEY`: Required for embeddings and chat
+- `QDRANT_URL`: Qdrant REST URL (e.g. `http://qdrant:6333` in Docker)
+- `QDRANT_COLLECTION`: Collection name (default `documents`)
+- `PORT`: Backend port (default `3000`)
+- `NODE_ENV`: Environment (`development`, `test`, `production`)
+
+## Recent Changes
+- Removed unsupported import: `@langchain/community/document_loaders/fs/text`; handle TXT via Blob -> `Document` instead
+- Updated Cheerio loader import to `@langchain/community/document_loaders/web/cheerio`
+- Fixed `QdrantVectorStore` constructor signature to `(embeddings, { url, collectionName })`
+- Verified backend starts and health endpoint returns 200
+
+## Files of Interest
+- `docker-compose.yml`: Defines services for Qdrant, backend, frontend
+- `backend/Dockerfile`: Node 18-alpine image build for backend
+- `backend/.env`: Backend environment file (do not commit sensitive values)
+
+## Future Work
+- Add tests for ingestion and query flows
+- Establish environment-specific configurations and CI
+- Expand observability (metrics/tracing) when needed 
