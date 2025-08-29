@@ -132,6 +132,86 @@ chmod +x scripts/deploy-backend-railway.sh
 RAILWAY_TOKEN=... ./scripts/deploy-backend-railway.sh
 ```
 
+### Detailed Deploy Script Usage
+
+#### Frontend on Vercel
+
+Prerequisites:
+- Node.js and npm available locally (for running the script and npx)
+- Vercel account and a Personal Access Token (Account Settings → Tokens)
+- Optional but recommended: Organization ID and Project ID if the project already exists on Vercel
+
+Required environment variables:
+- `VERCEL_TOKEN`: Your Vercel token (required)
+- `VERCEL_ORG_ID`: Your Vercel organization ID (optional, improves linking)
+- `VERCEL_PROJECT_ID`: Your Vercel project ID (optional, improves linking)
+- Optional overrides: `FRONTEND_DIR` (defaults to `frontend`), `ENVIRONMENT` (defaults to `production`)
+
+Frontend environment variables to configure on Vercel (recommended):
+- `NEXT_PUBLIC_BACKEND_URL`: Your backend base URL (Railway URL or other)
+- `NEXT_PUBLIC_SUPABASE_URL` (optional)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` (optional)
+
+How to run:
+```bash
+export VERCEL_TOKEN=YOUR_VERCEL_TOKEN
+# Optionally, set org/project IDs for a no-prompt link
+export VERCEL_ORG_ID=your_org_id
+export VERCEL_PROJECT_ID=your_project_id
+
+chmod +x scripts/deploy-frontend-vercel.sh
+FRONTEND_DIR=frontend ENVIRONMENT=production ./scripts/deploy-frontend-vercel.sh
+```
+
+What the script does:
+- Runs `vercel pull` non-interactively to populate `.vercel/project.json`
+- Installs dependencies and runs `vercel build`
+- Deploys the prebuilt output with `vercel deploy --prebuilt --prod`
+- Prints the final deployment URL
+
+Tips:
+- To locate org/project IDs, you can run `npx vercel projects ls` and inspect the output, or link once manually with `npx vercel link`.
+- Set project env vars on Vercel once (`npx vercel env set ...`) so all subsequent deploys work without prompts.
+
+#### Backend on Railway
+
+Prerequisites:
+- Railway account and a Railway Token (Account Settings → Tokens)
+- Node.js and npm available locally (for running the script and npx)
+
+Required environment variables:
+- `RAILWAY_TOKEN`: Your Railway token (required)
+- Optional overrides: `BACKEND_DIR` (defaults to `backend`), `RAILWAY_SERVICE` (defaults to `backend`)
+
+Backend environment variables to configure on Railway (recommended):
+- `PORT=3000`
+- `GOOGLE_API_KEY=...`
+- If using local Qdrant (not recommended in hosted envs): `QDRANT_URL=http://qdrant:6333`
+- If using Qdrant Cloud: `QDRANT_URL=https://YOUR-CLUSTER.qdrant.io`, `QDRANT_API_KEY=...` (and set your intended `QDRANT_COLLECTION`)
+- Optional: `QDRANT_COLLECTION=documents` (or any name)
+
+How to run:
+```bash
+export RAILWAY_TOKEN=YOUR_RAILWAY_TOKEN
+
+chmod +x scripts/deploy-backend-railway.sh
+BACKEND_DIR=backend RAILWAY_SERVICE=backend ./scripts/deploy-backend-railway.sh
+```
+
+What the script does:
+- Installs dependencies
+- Runs `railway up` to create/link the project/service non-interactively
+- Triggers `railway deploy` for the specified service
+
+After deploy:
+- Set or verify service variables in the Railway dashboard (Environment → Variables)
+- Find your backend URL in the Railway dashboard (Domains) and set it as `NEXT_PUBLIC_BACKEND_URL` in Vercel for the frontend
+
+Troubleshooting:
+- Invalid tokens: regenerate `VERCEL_TOKEN`/`RAILWAY_TOKEN` and export them before running scripts
+- Missing env vars: ensure the platform has the variables listed above; deploys may succeed but runtime will fail without them
+- Qdrant Cloud connection: use full https URL and a valid API key; verify that REST access is allowed for your cluster
+
 ### Qdrant Cloud Configuration (Optional)
 
 For enhanced scalability and performance, you can optionally use Qdrant Cloud instead of the local Qdrant instance:
